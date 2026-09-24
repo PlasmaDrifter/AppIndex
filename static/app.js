@@ -229,9 +229,21 @@ let activeModalApp = null;
 
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
-  initSettingsUI();
-  setupEventListeners();
-  loadApplications();
+  try {
+    initSettingsUI();
+  } catch (err) {
+    console.error("Error initializing settings UI:", err);
+  }
+  try {
+    setupEventListeners();
+  } catch (err) {
+    console.error("Error setting up event listeners:", err);
+  }
+  try {
+    loadApplications();
+  } catch (err) {
+    console.error("Error loading applications:", err);
+  }
 });
 
 function setupEventListeners() {
@@ -362,18 +374,27 @@ function setupEventListeners() {
   });
 
   // Settings Modal controls
-  if (btnSettings) {
-    btnSettings.addEventListener("click", openSettingsModal);
+  const settingsBtnElem = document.getElementById("btn-settings");
+  const settingsModalElem = document.getElementById("settings-modal");
+  const settingsCloseElem = document.getElementById("settings-close-btn");
+  const settingsDoneElem = document.getElementById("settings-done-btn");
+
+  if (settingsBtnElem) {
+    settingsBtnElem.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openSettingsModal();
+    });
   }
-  if (settingsCloseBtn) {
-    settingsCloseBtn.addEventListener("click", closeSettingsModal);
+  if (settingsCloseElem) {
+    settingsCloseElem.addEventListener("click", closeSettingsModal);
   }
-  if (settingsDoneBtn) {
-    settingsDoneBtn.addEventListener("click", closeSettingsModal);
+  if (settingsDoneElem) {
+    settingsDoneElem.addEventListener("click", closeSettingsModal);
   }
-  if (settingsModal) {
-    settingsModal.addEventListener("click", (e) => {
-      if (e.target === settingsModal) closeSettingsModal();
+  if (settingsModalElem) {
+    settingsModalElem.addEventListener("click", (e) => {
+      if (e.target === settingsModalElem) closeSettingsModal();
     });
   }
 
@@ -864,6 +885,7 @@ function applyThemeColors(colorsObj) {
 }
 
 function applyDensity(density) {
+  if (!document.body) return;
   document.body.classList.remove("density-compact", "density-standard", "density-spacious");
   document.body.classList.add("density-" + (density || "standard"));
 }
@@ -901,7 +923,7 @@ function syncSettingsUI() {
     currentColors = userSettings.customColors;
   } else if (PRESET_THEMES[userSettings.themeId]) {
     currentColors = PRESET_THEMES[userSettings.themeId].colors;
-  } else if (userSettings.savedCustomThemes[userSettings.themeId]) {
+  } else if (userSettings.savedCustomThemes && userSettings.savedCustomThemes[userSettings.themeId]) {
     currentColors = userSettings.savedCustomThemes[userSettings.themeId];
   } else {
     currentColors = PRESET_THEMES["catppuccin"].colors;
