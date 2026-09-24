@@ -49,6 +49,13 @@
             <a href="/api/export?format=json" download="installed_apps.json" class="dropdown-item">Export as JSON</a>
           </div>
         </div>
+        <button id="btn-settings" class="btn btn-outline btn-sm" title="Application Settings">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </button>
       </div>
     </header>
 
@@ -284,6 +291,173 @@
             </div>
             <pre id="raw-desktop-content" class="raw-code" style="display: none;"></pre>
           </div>
+        </div>
+      </div>
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-content settings-modal-content">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <div class="settings-header-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </div>
+            <div>
+              <h2>Application Settings</h2>
+              <span class="modal-subtitle">Customize themes, view density, and typography scaling</span>
+            </div>
+          </div>
+          <button id="settings-close-btn" class="modal-close">&times;</button>
+        </div>
+
+        <div class="modal-body settings-modal-body">
+          <!-- Section 1: View Density -->
+          <div class="settings-section">
+            <h3 class="settings-section-title">View Density</h3>
+            <p class="settings-section-desc">Control vertical spacing and layout tightness across tables and cards.</p>
+            <div class="density-selector" id="density-selector">
+              <button type="button" class="density-btn" data-density="compact">
+                <span class="density-title">Compact</span>
+                <span class="density-sub">Tight padding &amp; smaller icons</span>
+              </button>
+              <button type="button" class="density-btn active" data-density="standard">
+                <span class="density-title">Standard</span>
+                <span class="density-sub">Comfortable default spacing</span>
+              </button>
+              <button type="button" class="density-btn" data-density="spacious">
+                <span class="density-title">Spacious</span>
+                <span class="density-sub">Relaxed padding &amp; larger rows</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: Font Size Scaling -->
+          <div class="settings-section">
+            <div class="section-title-row">
+              <div>
+                <h3 class="settings-section-title">Font Size Scale</h3>
+                <p class="settings-section-desc">Adjust the global typography size across the application.</p>
+              </div>
+              <span id="font-scale-value" class="font-scale-badge">100%</span>
+            </div>
+
+            <div class="font-slider-container">
+              <input type="range" id="font-scale-slider" min="80" max="130" step="5" value="100" class="font-slider">
+              <div class="font-slider-ticks">
+                <span class="tick-btn" data-val="85">Small (85%)</span>
+                <span class="tick-btn" data-val="100">Default (100%)</span>
+                <span class="tick-btn" data-val="115">Large (115%)</span>
+                <span class="tick-btn" data-val="130">Max (130%)</span>
+              </div>
+            </div>
+
+            <div class="font-preview-box">
+              <span class="preview-label">Live Row Preview:</span>
+              <div class="preview-content">
+                <span class="preview-app-name">VLC Media Player</span>
+                <span class="badge badge-source-repo_rpm">Nobara Repo (RPM)</span>
+                <code class="preview-code">sudo dnf remove vlc</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Preset Themes -->
+          <div class="settings-section">
+            <div class="section-title-row">
+              <div>
+                <h3 class="settings-section-title">Color Themes</h3>
+                <p class="settings-section-desc">Select a preset color theme or pick custom elements below.</p>
+              </div>
+              <button id="btn-reset-theme" class="btn btn-outline btn-sm">Reset to Default</button>
+            </div>
+
+            <div class="theme-presets-grid" id="theme-presets-grid">
+              <!-- Dynamically populated by JS -->
+            </div>
+          </div>
+
+          <!-- Section 4: Custom Theme Builder -->
+          <div class="settings-section">
+            <h3 class="settings-section-title">Customize Theme Elements</h3>
+            <p class="settings-section-desc">Fine-tune individual colors. Changes preview in real-time.</p>
+
+            <div class="color-pickers-grid">
+              <div class="color-picker-item">
+                <label for="color-bg-primary">App Background</label>
+                <div class="color-input-wrapper">
+                  <input type="color" id="color-bg-primary" value="#181926">
+                  <span class="color-hex" id="hex-bg-primary">#181926</span>
+                </div>
+              </div>
+              <div class="color-picker-item">
+                <label for="color-bg-secondary">Bar &amp; Surface Background</label>
+                <div class="color-input-wrapper">
+                  <input type="color" id="color-bg-secondary" value="#1e2030">
+                  <span class="color-hex" id="hex-bg-secondary">#1e2030</span>
+                </div>
+              </div>
+              <div class="color-picker-item">
+                <label for="color-bg-card">Card / Table Header</label>
+                <div class="color-input-wrapper">
+                  <input type="color" id="color-bg-card" value="#24273a">
+                  <span class="color-hex" id="hex-bg-card">#24273a</span>
+                </div>
+              </div>
+              <div class="color-picker-item">
+                <label for="color-border">Border Color</label>
+                <div class="color-input-wrapper">
+                  <input type="color" id="color-border" value="#363a4f">
+                  <span class="color-hex" id="hex-border">#363a4f</span>
+                </div>
+              </div>
+              <div class="color-picker-item">
+                <label for="color-text-primary">Primary Text</label>
+                <div class="color-input-wrapper">
+                  <input type="color" id="color-text-primary" value="#cad3f5">
+                  <span class="color-hex" id="hex-text-primary">#cad3f5</span>
+                </div>
+              </div>
+              <div class="color-picker-item">
+                <label for="color-text-muted">Muted Text</label>
+                <div class="color-input-wrapper">
+                  <input type="color" id="color-text-muted" value="#8087a2">
+                  <span class="color-hex" id="hex-text-muted">#8087a2</span>
+                </div>
+              </div>
+              <div class="color-picker-item">
+                <label for="color-accent-blue">Primary Accent</label>
+                <div class="color-input-wrapper">
+                  <input type="color" id="color-accent-blue" value="#8aadf4">
+                  <span class="color-hex" id="hex-accent-blue">#8aadf4</span>
+                </div>
+              </div>
+              <div class="color-picker-item">
+                <label for="color-accent-purple">Secondary Accent</label>
+                <div class="color-input-wrapper">
+                  <input type="color" id="color-accent-purple" value="#c6a0f6">
+                  <span class="color-hex" id="hex-accent-purple">#c6a0f6</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Save Custom Theme Form -->
+            <div class="save-custom-theme-row">
+              <input type="text" id="custom-theme-name" placeholder="Name your custom theme..." maxlength="30" class="input-text theme-name-input">
+              <button id="btn-save-custom-theme" class="btn btn-primary btn-sm">Save Theme</button>
+            </div>
+
+            <!-- Saved Custom Themes List -->
+            <div id="saved-custom-themes-section" style="margin-top: 14px; display: none;">
+              <span class="preview-label">Your Saved Custom Themes:</span>
+              <div class="saved-themes-list" id="saved-themes-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="settings-done-btn" class="btn btn-primary">Done</button>
         </div>
       </div>
     </div>

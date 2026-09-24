@@ -48,10 +48,188 @@ const modalCopyCmdBtn = document.getElementById("modal-copy-cmd-btn");
 const btnToggleRaw = document.getElementById("btn-toggle-raw");
 const rawDesktopContent = document.getElementById("raw-desktop-content");
 
+// Settings & Theme Presets
+const STORAGE_KEY = "app_menu_inspector_settings_v1";
+
+const PRESET_THEMES = {
+  "catppuccin": {
+    name: "Catppuccin Macchiato",
+    colors: {
+      "--bg-primary": "#181926",
+      "--bg-secondary": "#1e2030",
+      "--bg-card": "#24273a",
+      "--bg-card-hover": "#2b2f46",
+      "--border-color": "#363a4f",
+      "--text-primary": "#cad3f5",
+      "--text-secondary": "#a5adcb",
+      "--text-muted": "#8087a2",
+      "--accent-blue": "#8aadf4",
+      "--accent-purple": "#c6a0f6",
+      "--accent-orange": "#f5a97f",
+      "--accent-green": "#a6da95",
+      "--accent-red": "#ed8796"
+    },
+    swatches: ["#181926", "#24273a", "#8aadf4", "#c6a0f6"]
+  },
+  "tokyo-night": {
+    name: "Tokyo Night",
+    colors: {
+      "--bg-primary": "#1a1b26",
+      "--bg-secondary": "#16161e",
+      "--bg-card": "#24283b",
+      "--bg-card-hover": "#2f354f",
+      "--border-color": "#292e42",
+      "--text-primary": "#c0caf5",
+      "--text-secondary": "#9aa5ce",
+      "--text-muted": "#565f89",
+      "--accent-blue": "#7aa2f7",
+      "--accent-purple": "#bb9af7",
+      "--accent-orange": "#ff9e64",
+      "--accent-green": "#9ece6a",
+      "--accent-red": "#f7768e"
+    },
+    swatches: ["#1a1b26", "#24283b", "#7aa2f7", "#bb9af7"]
+  },
+  "nord": {
+    name: "Nord",
+    colors: {
+      "--bg-primary": "#2e3440",
+      "--bg-secondary": "#242933",
+      "--bg-card": "#3b4252",
+      "--bg-card-hover": "#434c5e",
+      "--border-color": "#4c566a",
+      "--text-primary": "#eceff4",
+      "--text-secondary": "#e5e9f0",
+      "--text-muted": "#81a1c1",
+      "--accent-blue": "#88c0d0",
+      "--accent-purple": "#b48ead",
+      "--accent-orange": "#d08770",
+      "--accent-green": "#a3be8c",
+      "--accent-red": "#bf616a"
+    },
+    swatches: ["#2e3440", "#3b4252", "#88c0d0", "#b48ead"]
+  },
+  "gruvbox": {
+    name: "Gruvbox Dark",
+    colors: {
+      "--bg-primary": "#1d2021",
+      "--bg-secondary": "#282828",
+      "--bg-card": "#32302f",
+      "--bg-card-hover": "#3c3836",
+      "--border-color": "#504945",
+      "--text-primary": "#ebdbb2",
+      "--text-secondary": "#d5c4a1",
+      "--text-muted": "#928374",
+      "--accent-blue": "#83a598",
+      "--accent-purple": "#d3869b",
+      "--accent-orange": "#fe8019",
+      "--accent-green": "#b8bb26",
+      "--accent-red": "#fb4934"
+    },
+    swatches: ["#1d2021", "#32302f", "#83a598", "#fe8019"]
+  },
+  "dracula": {
+    name: "Dracula",
+    colors: {
+      "--bg-primary": "#21222c",
+      "--bg-secondary": "#282a36",
+      "--bg-card": "#343746",
+      "--bg-card-hover": "#44475a",
+      "--border-color": "#6272a4",
+      "--text-primary": "#f8f8f2",
+      "--text-secondary": "#e2e2dc",
+      "--text-muted": "#9ea8c7",
+      "--accent-blue": "#8be9fd",
+      "--accent-purple": "#bd93f9",
+      "--accent-orange": "#ffb86c",
+      "--accent-green": "#50fa7b",
+      "--accent-red": "#ff5555"
+    },
+    swatches: ["#21222c", "#343746", "#8be9fd", "#bd93f9"]
+  },
+  "cyberpunk": {
+    name: "Cyberpunk",
+    colors: {
+      "--bg-primary": "#0d0e15",
+      "--bg-secondary": "#141622",
+      "--bg-card": "#1a1d2e",
+      "--bg-card-hover": "#262b45",
+      "--border-color": "#2f3659",
+      "--text-primary": "#e6e6f0",
+      "--text-secondary": "#a0a5c0",
+      "--text-muted": "#6a7090",
+      "--accent-blue": "#00f0ff",
+      "--accent-purple": "#ff007f",
+      "--accent-orange": "#ffb800",
+      "--accent-green": "#05ffa1",
+      "--accent-red": "#ff2a5f"
+    },
+    swatches: ["#0d0e15", "#1a1d2e", "#00f0ff", "#ff007f"]
+  },
+  "clean-light": {
+    name: "Clean Light",
+    colors: {
+      "--bg-primary": "#f5f7fb",
+      "--bg-secondary": "#e9edf5",
+      "--bg-card": "#ffffff",
+      "--bg-card-hover": "#f0f4fa",
+      "--border-color": "#d5dbe7",
+      "--text-primary": "#1e2532",
+      "--text-secondary": "#49556a",
+      "--text-muted": "#768297",
+      "--accent-blue": "#2563eb",
+      "--accent-purple": "#7c3aed",
+      "--accent-orange": "#ea580c",
+      "--accent-green": "#16a34a",
+      "--accent-red": "#dc2626"
+    },
+    swatches: ["#f5f7fb", "#ffffff", "#2563eb", "#7c3aed"]
+  }
+};
+
+const COLOR_PICKER_MAP = [
+  { inputId: "color-bg-primary", hexId: "hex-bg-primary", varName: "--bg-primary" },
+  { inputId: "color-bg-secondary", hexId: "hex-bg-secondary", varName: "--bg-secondary" },
+  { inputId: "color-bg-card", hexId: "hex-bg-card", varName: "--bg-card" },
+  { inputId: "color-border", hexId: "hex-border", varName: "--border-color" },
+  { inputId: "color-text-primary", hexId: "hex-text-primary", varName: "--text-primary" },
+  { inputId: "color-text-muted", hexId: "hex-text-muted", varName: "--text-muted" },
+  { inputId: "color-accent-blue", hexId: "hex-accent-blue", varName: "--accent-blue" },
+  { inputId: "color-accent-purple", hexId: "hex-accent-purple", varName: "--accent-purple" },
+];
+
+let userSettings = {
+  themeId: "catppuccin",
+  density: "standard",
+  fontScale: 100,
+  customColors: null,
+  savedCustomThemes: {}
+};
+
+// Settings Modal Elements
+const settingsModal = document.getElementById("settings-modal");
+const btnSettings = document.getElementById("btn-settings");
+const settingsCloseBtn = document.getElementById("settings-close-btn");
+const settingsDoneBtn = document.getElementById("settings-done-btn");
+const densitySelector = document.getElementById("density-selector");
+const fontScaleSlider = document.getElementById("font-scale-slider");
+const fontScaleValue = document.getElementById("font-scale-value");
+const themePresetsGrid = document.getElementById("theme-presets-grid");
+const btnResetTheme = document.getElementById("btn-reset-theme");
+const customThemeName = document.getElementById("custom-theme-name");
+const btnSaveCustomTheme = document.getElementById("btn-save-custom-theme");
+const savedCustomThemesSection = document.getElementById("saved-custom-themes-section");
+const savedThemesList = document.getElementById("saved-themes-list");
+
+// Immediate startup theme application (prevent flash)
+loadSavedSettings();
+applyAllActiveSettings();
+
 let activeModalApp = null;
 
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
+  initSettingsUI();
   setupEventListeners();
   loadApplications();
 });
@@ -177,8 +355,27 @@ function setupEventListeners() {
     if (e.target === detailModal) closeModal();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && detailModal.style.display !== "none") closeModal();
+    if (e.key === "Escape") {
+      if (detailModal && detailModal.style.display !== "none") closeModal();
+      if (settingsModal && settingsModal.style.display !== "none") closeSettingsModal();
+    }
   });
+
+  // Settings Modal controls
+  if (btnSettings) {
+    btnSettings.addEventListener("click", openSettingsModal);
+  }
+  if (settingsCloseBtn) {
+    settingsCloseBtn.addEventListener("click", closeSettingsModal);
+  }
+  if (settingsDoneBtn) {
+    settingsDoneBtn.addEventListener("click", closeSettingsModal);
+  }
+  if (settingsModal) {
+    settingsModal.addEventListener("click", (e) => {
+      if (e.target === settingsModal) closeSettingsModal();
+    });
+  }
 
   // Modal Copy Command
   modalCopyCmdBtn.addEventListener("click", () => {
@@ -605,4 +802,372 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+// ==========================================
+// Settings, Theme & Customization Engine
+// ==========================================
+
+function loadSavedSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      userSettings = {
+        themeId: parsed.themeId || "catppuccin",
+        density: parsed.density || "standard",
+        fontScale: typeof parsed.fontScale === "number" ? parsed.fontScale : 100,
+        customColors: parsed.customColors || null,
+        savedCustomThemes: parsed.savedCustomThemes || {}
+      };
+    }
+  } catch (err) {
+    console.warn("Could not load saved settings:", err);
+  }
+}
+
+function saveSettingsToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userSettings));
+  } catch (err) {
+    console.warn("Could not save settings:", err);
+  }
+}
+
+function applyAllActiveSettings() {
+  // Apply Theme
+  if (userSettings.themeId === "custom" && userSettings.customColors) {
+    applyThemeColors(userSettings.customColors);
+  } else if (PRESET_THEMES[userSettings.themeId]) {
+    applyThemeColors(PRESET_THEMES[userSettings.themeId].colors);
+  } else if (userSettings.savedCustomThemes && userSettings.savedCustomThemes[userSettings.themeId]) {
+    applyThemeColors(userSettings.savedCustomThemes[userSettings.themeId]);
+  } else {
+    applyThemeColors(PRESET_THEMES["catppuccin"].colors);
+  }
+
+  // Apply Density
+  applyDensity(userSettings.density);
+
+  // Apply Font Scale
+  applyFontScale(userSettings.fontScale);
+}
+
+function applyThemeColors(colorsObj) {
+  if (!colorsObj) return;
+  const root = document.documentElement;
+  for (const [key, val] of Object.entries(colorsObj)) {
+    root.style.setProperty(key, val);
+  }
+}
+
+function applyDensity(density) {
+  document.body.classList.remove("density-compact", "density-standard", "density-spacious");
+  document.body.classList.add("density-" + (density || "standard"));
+}
+
+function applyFontScale(scaleVal) {
+  const scale = (scaleVal || 100) / 100;
+  document.documentElement.style.setProperty("--font-scale", scale.toString());
+}
+
+function initSettingsUI() {
+  renderPresetThemeGrid();
+  renderSavedCustomThemes();
+  syncSettingsUI();
+  bindSettingsInteractiveEvents();
+}
+
+function syncSettingsUI() {
+  // Sync Density Buttons
+  const selector = document.getElementById("density-selector");
+  if (selector) {
+    selector.querySelectorAll(".density-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.density === userSettings.density);
+    });
+  }
+
+  // Sync Font Scale
+  const slider = document.getElementById("font-scale-slider");
+  const valBadge = document.getElementById("font-scale-value");
+  if (slider) slider.value = userSettings.fontScale;
+  if (valBadge) valBadge.textContent = userSettings.fontScale + "%";
+
+  // Sync Color Pickers
+  let currentColors = {};
+  if (userSettings.themeId === "custom" && userSettings.customColors) {
+    currentColors = userSettings.customColors;
+  } else if (PRESET_THEMES[userSettings.themeId]) {
+    currentColors = PRESET_THEMES[userSettings.themeId].colors;
+  } else if (userSettings.savedCustomThemes[userSettings.themeId]) {
+    currentColors = userSettings.savedCustomThemes[userSettings.themeId];
+  } else {
+    currentColors = PRESET_THEMES["catppuccin"].colors;
+  }
+  updateColorPickersUI(currentColors);
+
+  // Highlight Active Theme Card
+  const presetsGrid = document.getElementById("theme-presets-grid");
+  if (presetsGrid) {
+    presetsGrid.querySelectorAll(".theme-preset-card").forEach((card) => {
+      card.classList.toggle("active", card.dataset.themeId === userSettings.themeId);
+    });
+  }
+}
+
+function renderPresetThemeGrid() {
+  const presetsGrid = document.getElementById("theme-presets-grid");
+  if (!presetsGrid) return;
+  presetsGrid.innerHTML = "";
+
+  Object.entries(PRESET_THEMES).forEach(([themeId, theme]) => {
+    const card = document.createElement("div");
+    card.className = "theme-preset-card" + (userSettings.themeId === themeId ? " active" : "");
+    card.dataset.themeId = themeId;
+
+    const swatchesHtml = theme.swatches
+      .map((hex) => `<span class="theme-swatch-circle" style="background-color: ${hex};"></span>`)
+      .join("");
+
+    card.innerHTML = `
+      <div class="theme-swatches">${swatchesHtml}</div>
+      <span class="theme-name" title="${theme.name}">${theme.name}</span>
+    `;
+
+    card.addEventListener("click", () => {
+      userSettings.themeId = themeId;
+      userSettings.customColors = null;
+      applyThemeColors(theme.colors);
+      updateColorPickersUI(theme.colors);
+      saveSettingsToStorage();
+      syncSettingsUI();
+      showToast(`Applied ${theme.name}`);
+    });
+
+    presetsGrid.appendChild(card);
+  });
+}
+
+function updateColorPickersUI(colorsObj) {
+  COLOR_PICKER_MAP.forEach(({ inputId, hexId, varName }) => {
+    const input = document.getElementById(inputId);
+    const hexSpan = document.getElementById(hexId);
+    if (!input) return;
+
+    let hexVal = colorsObj[varName];
+    if (!hexVal) {
+      hexVal = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    }
+    hexVal = normalizeHex(hexVal);
+
+    input.value = hexVal;
+    if (hexSpan) hexSpan.textContent = hexVal.toUpperCase();
+  });
+}
+
+function normalizeHex(colorStr) {
+  if (!colorStr) return "#000000";
+  colorStr = colorStr.trim();
+  if (colorStr.startsWith("#") && (colorStr.length === 7 || colorStr.length === 4)) {
+    if (colorStr.length === 4) {
+      return "#" + colorStr[1] + colorStr[1] + colorStr[2] + colorStr[2] + colorStr[3] + colorStr[3];
+    }
+    return colorStr;
+  }
+  const match = colorStr.match(/\d+/g);
+  if (match && match.length >= 3) {
+    const r = parseInt(match[0], 10).toString(16).padStart(2, "0");
+    const g = parseInt(match[1], 10).toString(16).padStart(2, "0");
+    const b = parseInt(match[2], 10).toString(16).padStart(2, "0");
+    return `#${r}${g}${b}`;
+  }
+  return "#000000";
+}
+
+function renderSavedCustomThemes() {
+  const customSection = document.getElementById("saved-custom-themes-section");
+  const list = document.getElementById("saved-themes-list");
+  if (!list || !customSection) return;
+  const names = Object.keys(userSettings.savedCustomThemes || {});
+
+  if (names.length === 0) {
+    customSection.style.display = "none";
+    list.innerHTML = "";
+    return;
+  }
+
+  customSection.style.display = "block";
+  list.innerHTML = "";
+
+  names.forEach((name) => {
+    const chip = document.createElement("div");
+    chip.className = "saved-theme-chip" + (userSettings.themeId === name ? " active" : "");
+
+    chip.innerHTML = `
+      <button class="saved-theme-apply-btn">${escapeHtml(name)}</button>
+      <button class="saved-theme-del-btn" title="Delete theme">&times;</button>
+    `;
+
+    chip.querySelector(".saved-theme-apply-btn").addEventListener("click", () => {
+      userSettings.themeId = name;
+      userSettings.customColors = null;
+      const themeColors = userSettings.savedCustomThemes[name];
+      applyThemeColors(themeColors);
+      updateColorPickersUI(themeColors);
+      saveSettingsToStorage();
+      syncSettingsUI();
+      renderSavedCustomThemes();
+      showToast(`Applied custom theme: ${name}`);
+    });
+
+    chip.querySelector(".saved-theme-del-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      delete userSettings.savedCustomThemes[name];
+      if (userSettings.themeId === name) {
+        userSettings.themeId = "catppuccin";
+        applyThemeColors(PRESET_THEMES["catppuccin"].colors);
+      }
+      saveSettingsToStorage();
+      syncSettingsUI();
+      renderSavedCustomThemes();
+      showToast(`Deleted theme: ${name}`);
+    });
+
+    list.appendChild(chip);
+  });
+}
+
+function bindSettingsInteractiveEvents() {
+  // Density selector buttons
+  const selector = document.getElementById("density-selector");
+  if (selector) {
+    selector.querySelectorAll(".density-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const density = btn.dataset.density;
+        userSettings.density = density;
+        applyDensity(density);
+        saveSettingsToStorage();
+        syncSettingsUI();
+      });
+    });
+  }
+
+  // Font scale slider
+  const slider = document.getElementById("font-scale-slider");
+  const valBadge = document.getElementById("font-scale-value");
+  if (slider) {
+    slider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      userSettings.fontScale = val;
+      applyFontScale(val);
+      if (valBadge) valBadge.textContent = val + "%";
+      saveSettingsToStorage();
+    });
+  }
+
+  // Quick tick buttons
+  document.querySelectorAll(".tick-btn").forEach((tick) => {
+    tick.addEventListener("click", () => {
+      const val = parseInt(tick.dataset.val, 10);
+      userSettings.fontScale = val;
+      applyFontScale(val);
+      if (slider) slider.value = val;
+      if (valBadge) valBadge.textContent = val + "%";
+      saveSettingsToStorage();
+    });
+  });
+
+  // Color pickers input
+  COLOR_PICKER_MAP.forEach(({ inputId, hexId, varName }) => {
+    const input = document.getElementById(inputId);
+    const hexSpan = document.getElementById(hexId);
+    if (!input) return;
+
+    input.addEventListener("input", (e) => {
+      const val = e.target.value;
+      if (hexSpan) hexSpan.textContent = val.toUpperCase();
+      document.documentElement.style.setProperty(varName, val);
+
+      if (!userSettings.customColors) {
+        userSettings.customColors = {};
+      }
+      userSettings.customColors[varName] = val;
+      userSettings.themeId = "custom";
+
+      // If card color changed, adjust card hover
+      if (varName === "--bg-card") {
+        document.documentElement.style.setProperty("--bg-card-hover", val);
+      }
+
+      saveSettingsToStorage();
+      const presetsGrid = document.getElementById("theme-presets-grid");
+      if (presetsGrid) {
+        presetsGrid.querySelectorAll(".theme-preset-card").forEach((c) => c.classList.remove("active"));
+      }
+    });
+  });
+
+  // Save custom theme button
+  const btnSaveTheme = document.getElementById("btn-save-custom-theme");
+  const nameInput = document.getElementById("custom-theme-name");
+  if (btnSaveTheme && nameInput) {
+    btnSaveTheme.addEventListener("click", () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        showToast("Please enter a name for the custom theme");
+        nameInput.focus();
+        return;
+      }
+
+      const colors = {};
+      COLOR_PICKER_MAP.forEach(({ inputId, varName }) => {
+        const input = document.getElementById(inputId);
+        if (input) colors[varName] = input.value;
+      });
+
+      // Include hover
+      colors["--bg-card-hover"] = colors["--bg-card"];
+
+      userSettings.savedCustomThemes[name] = colors;
+      userSettings.themeId = name;
+      userSettings.customColors = null;
+      nameInput.value = "";
+
+      saveSettingsToStorage();
+      syncSettingsUI();
+      renderSavedCustomThemes();
+      showToast(`Custom theme "${name}" saved!`);
+    });
+  }
+
+  // Reset to default button
+  const btnReset = document.getElementById("btn-reset-theme");
+  if (btnReset) {
+    btnReset.addEventListener("click", () => {
+      userSettings.themeId = "catppuccin";
+      userSettings.density = "standard";
+      userSettings.fontScale = 100;
+      userSettings.customColors = null;
+
+      applyAllActiveSettings();
+      syncSettingsUI();
+      saveSettingsToStorage();
+      showToast("Reset all settings to default");
+    });
+  }
+}
+
+function openSettingsModal() {
+  const modal = document.getElementById("settings-modal");
+  if (modal) {
+    syncSettingsUI();
+    modal.style.display = "flex";
+  }
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById("settings-modal");
+  if (modal) {
+    modal.style.display = "none";
+  }
 }
