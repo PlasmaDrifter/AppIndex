@@ -448,12 +448,6 @@ body {
   font-weight: 600;
 }
 
-.tab-btn.tab-highlight:not(.active) {
-  border-color: var(--accent-yellow);
-  color: var(--accent-yellow);
-  background-color: rgba(238, 212, 159, 0.12);
-}
-
 /* Loading & Empty States */
 .loading-state, .empty-state {
   display: flex;
