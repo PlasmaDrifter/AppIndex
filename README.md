@@ -121,21 +121,68 @@ Alternatively, using pip:
 pip install fastapi uvicorn pyxdg
 ```
 
-### 3. Run Manually
+### 3. Launch AppIndex
 
+You can launch AppIndex directly using the bundled launcher script:
+
+```bash
+./appindex.sh
+```
+
+This starts the backend server in the background (if not already running) and opens your default browser at `http://localhost:8765`.
+
+To run the server in the foreground instead:
 ```bash
 python3 server.py --host 127.0.0.1 --port 8765
 ```
 
-Open `http://localhost:8765` in your browser.
+---
+
+## Command-Line & Desktop Launcher Setup
+
+AppIndex comes with an included portable launcher script (`appindex.sh`). You can symlink it to your personal `~/.local/bin` directory (or any directory in your `$PATH`):
+
+```bash
+# Link the launcher into ~/.local/bin
+mkdir -p ~/.local/bin
+ln -sf "$(pwd)/appindex.sh" ~/.local/bin/appindex
+```
+
+The script supports standard commands:
+```bash
+appindex          # Ensure server is running and open in browser (default)
+appindex start    # Start server in background if not running
+appindex open     # Open browser to http://localhost:8765
+appindex status   # Check server health
+appindex scan     # Trigger a fresh rescan via API
+```
+
+### Desktop Menu Entry
+
+To integrate AppIndex into your application launcher (KDE, GNOME, XFCE, etc.), create `~/.local/share/applications/appindex.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=AppIndex
+GenericName=Linux Application & Package Inventory
+Comment=Inspect installed applications, package managers, and uninstall commands
+Exec=appindex
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;System;
+Keywords=apps;packages;inventory;uninstall;flatpak;appimage;rpm;pacman;apt;steam;pwa;
+```
+
+*(Note: If you did not symlink `appindex` to `~/.local/bin`, set `Exec` to the absolute path of `appindex.sh` in your clone directory, e.g., `Exec=/path/to/AppIndex/appindex.sh launch`)*
 
 ---
 
-## Systemd User Service Setup
+## Optional: Systemd User Service Setup
 
-To run AppIndex seamlessly in the background as a user service:
+If you prefer to have AppIndex running permanently in the background as a user service:
 
-1. Create a service file at `~/.config/systemd/user/appindex.service`:
+1. Create `~/.config/systemd/user/appindex.service`:
 
 ```ini
 [Unit]
@@ -144,57 +191,21 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Source/AppIndex
-ExecStart=/usr/bin/python3 %h/Source/AppIndex/server.py --port 8765
+WorkingDirectory=%h/path/to/AppIndex
+ExecStart=/usr/bin/python3 %h/path/to/AppIndex/server.py --port 8765
 Restart=on-failure
 RestartSec=3
 
 [Install]
 WantedBy=default.target
 ```
+*(Replace `%h/path/to/AppIndex` with the path where you cloned the repository; `%h` expands automatically to your home directory)*
 
 2. Reload systemd and enable the service:
 
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now appindex.service
-```
-
----
-
-## Desktop Menu Launcher
-
-To launch AppIndex directly from your KDE, GNOME, or XFCE application menu:
-
-1. Create launcher script at `~/Scripts/appindex.sh`:
-
-```bash
-#!/bin/bash
-PORT=8765
-URL="http://127.0.0.1:${PORT}"
-APPINDEX_DIR="${APPINDEX_DIR:-$HOME/Source/AppIndex}"
-
-# Ensure service is active or start it
-systemctl --user start appindex.service 2>/dev/null || nohup python3 "${APPINDEX_DIR}/server.py" --port $PORT >/dev/null 2>&1 &
-
-# Open in default web browser
-xdg-open "$URL"
-```
-Make it executable: `chmod +x ~/Scripts/appindex.sh`
-
-2. Create desktop entry at `~/.local/share/applications/appindex.desktop`:
-
-```ini
-[Desktop Entry]
-Type=Application
-Name=AppIndex
-GenericName=Linux Application & Package Inventory
-Comment=Inspect installed applications, package managers, and uninstall commands
-Exec=sh -c '"$HOME/Scripts/appindex.sh" launch'
-Icon=utilities-terminal
-Terminal=false
-Categories=Utility;System;
-Keywords=apps;packages;inventory;uninstall;flatpak;appimage;rpm;pacman;apt;steam;pwa;
 ```
 
 ---
