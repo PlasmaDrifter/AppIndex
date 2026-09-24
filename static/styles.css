@@ -1258,15 +1258,15 @@ body.density-spacious .app-icon {
 
 /* Settings Modal Styles */
 .settings-modal-content {
-  max-width: 760px;
-  max-height: 88vh;
+  max-width: 720px;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
 }
 
 .settings-header-icon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-sm);
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -1279,14 +1279,14 @@ body.density-spacious .app-icon {
 
 .settings-modal-body {
   overflow-y: auto;
-  padding: 20px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
 }
 
 .modal-footer {
-  padding: 14px 24px;
+  padding: 10px 20px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -1296,38 +1296,44 @@ body.density-spacious .app-icon {
 }
 
 #settings-done-btn {
-  padding: 8px 24px;
-  font-size: 13.5px;
+  padding: 6px 22px;
+  font-size: 13px;
   font-weight: 600;
   border-radius: var(--radius-sm);
   cursor: pointer;
+}
+
+.settings-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .settings-section {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 16px 18px;
+  padding: 11px 14px;
 }
 
 .settings-section-title {
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 2px;
 }
 
 .settings-section-desc {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 
 .section-title-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .section-title-row .settings-section-desc {
@@ -1338,18 +1344,18 @@ body.density-spacious .app-icon {
 .density-selector {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 .density-btn {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  padding: 7px 8px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
+  gap: 2px;
   cursor: pointer;
   transition: all 0.15s ease;
   color: var(--text-primary);
@@ -1367,7 +1373,7 @@ body.density-spacious .app-icon {
 }
 
 .density-title {
-  font-size: 13.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -1377,29 +1383,29 @@ body.density-spacious .app-icon {
 }
 
 .density-sub {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-muted);
 }
 
 /* Font Scale Slider */
 .font-scale-badge {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent-blue);
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: var(--radius-sm);
 }
 
 .font-slider-container {
-  margin-bottom: 14px;
+  margin-bottom: 2px;
 }
 
 .font-slider {
   width: 100%;
-  height: 6px;
+  height: 5px;
   border-radius: 3px;
   background: var(--border-color);
   outline: none;
@@ -1410,11 +1416,11 @@ body.density-spacious .app-icon {
 .font-slider-ticks {
   display: flex;
   justify-content: space-between;
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
 .tick-btn {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-muted);
   cursor: pointer;
   transition: color 0.15s;
@@ -1424,63 +1430,22 @@ body.density-spacious .app-icon {
   color: var(--accent-blue);
 }
 
-.font-preview-box {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.preview-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.preview-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.preview-app-name {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: calc(15px * var(--font-scale, 1));
-}
-
-.preview-code {
-  font-family: var(--font-mono);
-  font-size: calc(13px * var(--font-scale, 1));
-  color: var(--accent-orange);
-  background-color: var(--bg-code, #141520);
-  border: 1px solid var(--border-color);
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
 /* Preset Themes Grid */
 .theme-presets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
 }
 
 .theme-preset-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 10px;
+  padding: 7px 8px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
   transition: all 0.15s ease;
 }
 
@@ -1497,18 +1462,18 @@ body.density-spacious .app-icon {
 
 .theme-swatches {
   display: flex;
-  gap: 5px;
+  gap: 4px;
 }
 
 .theme-swatch-circle {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   border: 1px solid var(--border-color);
 }
 
 .theme-name {
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -1519,39 +1484,43 @@ body.density-spacious .app-icon {
 /* Color Pickers Grid */
 .color-pickers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 10px;
 }
 
 .color-picker-item {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
 .color-picker-item label {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-secondary);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .color-input-wrapper {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 4px 8px;
+  padding: 3px 6px;
 }
 
 .color-input-wrapper input[type="color"] {
   -webkit-appearance: none;
   border: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
   cursor: pointer;
   background: none;
   padding: 0;
@@ -1563,12 +1532,12 @@ body.density-spacious .app-icon {
 
 .color-input-wrapper input[type="color"]::-webkit-color-swatch {
   border: 1px solid var(--border-color);
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 .color-hex {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-primary);
   text-transform: uppercase;
 }
@@ -1576,7 +1545,7 @@ body.density-spacious .app-icon {
 /* Save Custom Theme */
 .save-custom-theme-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -1585,9 +1554,9 @@ body.density-spacious .app-icon {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 6px 12px;
+  padding: 5px 10px;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 12px;
   outline: none;
 }
 
@@ -1598,8 +1567,8 @@ body.density-spacious .app-icon {
 .saved-themes-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .saved-theme-chip {
@@ -1609,8 +1578,8 @@ body.density-spacious .app-icon {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: 3px 8px;
+  font-size: 11.5px;
 }
 
 .saved-theme-chip.active {
@@ -1622,7 +1591,7 @@ body.density-spacious .app-icon {
   background: none;
   border: none;
   color: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1632,7 +1601,7 @@ body.density-spacious .app-icon {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   padding: 0 2px;
 }

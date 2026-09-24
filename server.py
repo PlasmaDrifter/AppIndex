@@ -8,16 +8,21 @@ import io
 import json
 import mimetypes
 import os
+import re
 from typing import Optional
 from fastapi import FastAPI, Query, HTTPException, Response
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import xdg.IconTheme
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 from scanner import scan_all_applications
 
-app = FastAPI(title="AppIndex", version="0.1.9")
+app = FastAPI(title="AppIndex", version="0.2.0")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -33,6 +38,21 @@ def get_cached_or_scan(force_refresh: bool = False):
     return _CACHED_DATA
 
 
+# Known common desktop icon themes to search in order of priority
+COMMON_ICON_THEMES = [
+    "hicolor",
+    "breeze",
+    "breeze-dark",
+    "Adwaita",
+    "Papirus",
+    "Papirus-Dark",
+    "Yaru",
+    "elementary",
+    "oxygen",
+    "gnome",
+]
+
+
 def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
     """Resolve an icon name or path to an existing local file."""
     if not icon_name_or_path:
@@ -46,17 +66,25 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
     if os.path.isabs(icon_name_or_path) and os.path.isfile(icon_name_or_path):
         return icon_name_or_path
 
-    # Try standard XDG Icon lookup
-    found = xdg.IconTheme.getIconPath(icon_name_or_path)
-    if found and os.path.isfile(found):
-        return found
+    # Try standard XDG Icon lookup across desktop themes
+    for theme in COMMON_ICON_THEMES:
+        try:
+            found = xdg.IconTheme.getIconPath(icon_name_or_path, theme=theme)
+            if found and os.path.isfile(found):
+                return found
+        except Exception:
+            pass
 
-    # Try with common extensions
+    # Try with common extensions across themes
     for ext in [".png", ".svg", ".xpm"]:
         if not icon_name_or_path.endswith(ext):
-            f = xdg.IconTheme.getIconPath(icon_name_or_path + ext)
-            if f and os.path.isfile(f):
-                return f
+            for theme in COMMON_ICON_THEMES:
+                try:
+                    f = xdg.IconTheme.getIconPath(icon_name_or_path + ext, theme=theme)
+                    if f and os.path.isfile(f):
+                        return f
+                except Exception:
+                    pass
         pix = f"/usr/share/pixmaps/{icon_name_or_path}{ext}"
         if os.path.isfile(pix):
             return pix
@@ -67,6 +95,76 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
         return pix_direct
 
     return None
+
+
+def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
+    """Convert an XPM file to PNG bytes for modern browser compatibility."""
+    if Image is None or not os.path.isfile(xpm_path):
+        return None
+
+    # First attempt standard Pillow loader
+    try:
+        im = Image.open(xpm_path)
+        buf = io.BytesIO()
+        im.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        pass
+
+    # Fallback: robust custom XPM parser for non-standard whitespace / large palettes
+    try:
+        with open(xpm_path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+
+        strings = re.findall(r"\"([^\"]*)\"", content)
+        if not strings:
+            return None
+
+        parts = strings[0].split()
+        if len(parts) < 4:
+            return None
+
+        width, height, ncolors, cpp = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+
+        palette = {}
+        for i in range(1, ncolors + 1):
+            line = strings[i]
+            key = line[:cpp]
+            rest = line[cpp:]
+            m = re.search(r"c\s+([^\s]+)", rest)
+            if m:
+                val = m.group(1)
+                if val.lower() == "none":
+                    palette[key] = (0, 0, 0, 0)
+                elif val.startswith("#"):
+                    hex_str = val[1:]
+                    if len(hex_str) == 6:
+                        r = int(hex_str[0:2], 16)
+                        g = int(hex_str[2:4], 16)
+                        b = int(hex_str[4:6], 16)
+                        palette[key] = (r, g, b, 255)
+                    elif len(hex_str) == 12:
+                        r = int(hex_str[0:2], 16)
+                        g = int(hex_str[4:6], 16)
+                        b = int(hex_str[8:10], 16)
+                        palette[key] = (r, g, b, 255)
+                else:
+                    palette[key] = (0, 0, 0, 255)
+
+        pixel_lines = strings[ncolors + 1 : ncolors + 1 + height]
+        img = Image.new("RGBA", (width, height))
+        pixels = img.load()
+
+        for y, line in enumerate(pixel_lines):
+            for x in range(width):
+                k = line[x * cpp : (x + 1) * cpp]
+                pixels[x, y] = palette.get(k, (0, 0, 0, 0))
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        return None
 
 
 # Default fallback SVG icon
@@ -118,6 +216,12 @@ async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Quer
     # Security check: never allow directory traversal or network shares
     resolved = resolve_icon_path(target)
     if resolved and os.path.isfile(resolved):
+        # Convert legacy .xpm to browser-compatible .png on the fly
+        if resolved.endswith(".xpm"):
+            png_bytes = convert_xpm_to_png(resolved)
+            if png_bytes:
+                return Response(content=png_bytes, media_type="image/png")
+
         mime, _ = mimetypes.guess_type(resolved)
         if not mime:
             if resolved.endswith(".svg"):

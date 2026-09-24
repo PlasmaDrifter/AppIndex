@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon.png">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/styles.css?v=0.1.9">
+  <link rel="stylesheet" href="/static/styles.css?v=0.2.0">
 </head>
 <body>
   <div class="app-layout">
@@ -279,52 +279,42 @@
         </div>
 
         <div class="modal-body settings-modal-body">
-          <!-- Section 1: View Density -->
-          <div class="settings-section">
-            <h3 class="settings-section-title">View Density</h3>
-            <p class="settings-section-desc">Control vertical spacing and layout tightness across tables and cards.</p>
-            <div class="density-selector" id="density-selector">
-              <button type="button" class="density-btn" data-density="compact">
-                <span class="density-title">Compact</span>
-                <span class="density-sub">Tight padding &amp; smaller icons</span>
-              </button>
-              <button type="button" class="density-btn active" data-density="standard">
-                <span class="density-title">Standard</span>
-                <span class="density-sub">Comfortable default spacing</span>
-              </button>
-              <button type="button" class="density-btn" data-density="spacious">
-                <span class="density-title">Spacious</span>
-                <span class="density-sub">Relaxed padding &amp; larger rows</span>
-              </button>
+          <!-- Row 1: View Density & Font Size Scale side-by-side -->
+          <div class="settings-row-2col">
+            <!-- Section 1: View Density -->
+            <div class="settings-section">
+              <h3 class="settings-section-title">View Density</h3>
+              <div class="density-selector" id="density-selector">
+                <button type="button" class="density-btn" data-density="compact">
+                  <span class="density-title">Compact</span>
+                  <span class="density-sub">Tight padding</span>
+                </button>
+                <button type="button" class="density-btn active" data-density="standard">
+                  <span class="density-title">Standard</span>
+                  <span class="density-sub">Default spacing</span>
+                </button>
+                <button type="button" class="density-btn" data-density="spacious">
+                  <span class="density-title">Spacious</span>
+                  <span class="density-sub">Relaxed padding</span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <!-- Section 2: Font Size Scaling -->
-          <div class="settings-section">
-            <div class="section-title-row">
-              <div>
+            <!-- Section 2: Font Size Scaling -->
+            <div class="settings-section">
+              <div class="section-title-row">
                 <h3 class="settings-section-title">Font Size Scale</h3>
-                <p class="settings-section-desc">Adjust the global typography size across the application.</p>
+                <span id="font-scale-value" class="font-scale-badge">100%</span>
               </div>
-              <span id="font-scale-value" class="font-scale-badge">100%</span>
-            </div>
 
-            <div class="font-slider-container">
-              <input type="range" id="font-scale-slider" min="80" max="130" step="5" value="100" class="font-slider">
-              <div class="font-slider-ticks">
-                <span class="tick-btn" data-val="85">Small (85%)</span>
-                <span class="tick-btn" data-val="100">Default (100%)</span>
-                <span class="tick-btn" data-val="115">Large (115%)</span>
-                <span class="tick-btn" data-val="130">Max (130%)</span>
-              </div>
-            </div>
-
-            <div class="font-preview-box">
-              <span class="preview-label">Live Row Preview:</span>
-              <div class="preview-content">
-                <span class="preview-app-name">VLC Media Player</span>
-                <span class="badge badge-source-repo_rpm">Nobara Repo (RPM)</span>
-                <code class="preview-code">sudo dnf remove vlc</code>
+              <div class="font-slider-container">
+                <input type="range" id="font-scale-slider" min="80" max="130" step="5" value="100" class="font-slider">
+                <div class="font-slider-ticks">
+                  <span class="tick-btn" data-val="85">Small (85%)</span>
+                  <span class="tick-btn" data-val="100">Default (100%)</span>
+                  <span class="tick-btn" data-val="115">Large (115%)</span>
+                  <span class="tick-btn" data-val="130">Max (130%)</span>
+                </div>
               </div>
             </div>
           </div>
@@ -334,9 +324,8 @@
             <div class="section-title-row">
               <div>
                 <h3 class="settings-section-title">Color Themes</h3>
-                <p class="settings-section-desc">Select a preset color theme or pick custom elements below.</p>
               </div>
-              <button id="btn-reset-theme" class="btn btn-outline btn-sm">Reset to Default</button>
+              <button id="btn-reset-theme" class="btn btn-outline btn-xs">Reset to Default</button>
             </div>
 
             <div class="theme-presets-grid" id="theme-presets-grid">
@@ -345,10 +334,8 @@
           </div>
 
           <!-- Section 4: Custom Theme Builder -->
-          <div class="settings-section">
+          <div class="settings-section" id="custom-theme-section">
             <h3 class="settings-section-title">Customize Theme Elements</h3>
-            <p class="settings-section-desc">Fine-tune individual colors. Changes preview in real-time.</p>
-
             <div class="color-pickers-grid">
               <div class="color-picker-item">
                 <label for="color-bg-primary">App Background</label>
@@ -358,7 +345,7 @@
                 </div>
               </div>
               <div class="color-picker-item">
-                <label for="color-bg-secondary">Bar &amp; Surface Background</label>
+                <label for="color-bg-secondary">Bar &amp; Surface</label>
                 <div class="color-input-wrapper">
                   <input type="color" id="color-bg-secondary" value="#1e2030">
                   <span class="color-hex" id="hex-bg-secondary">#1e2030</span>
@@ -415,7 +402,7 @@
             </div>
 
             <!-- Saved Custom Themes List -->
-            <div id="saved-custom-themes-section" style="margin-top: 14px; display: none;">
+            <div id="saved-custom-themes-section" style="margin-top: 6px; display: none;">
               <span class="preview-label">Your Saved Custom Themes:</span>
               <div class="saved-themes-list" id="saved-themes-list"></div>
             </div>
@@ -627,6 +614,6 @@
     <div id="toast" class="toast" style="display: none;"></div>
   </div>
 
-  <script src="/static/app.js?v=0.1.9"></script>
+  <script src="/static/app.js?v=0.2.0"></script>
 </body>
 </html>

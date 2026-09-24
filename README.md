@@ -103,22 +103,22 @@ cd AppIndex
 
 **On Fedora / Nobara / RHEL / CentOS**:
 ```bash
-sudo dnf install python3-fastapi python3-uvicorn python3-pyxdg python3-rpm
+sudo dnf install python3-fastapi python3-uvicorn python3-pyxdg python3-rpm python3-pillow
 ```
 
 **On Arch Linux / Manjaro / EndeavourOS**:
 ```bash
-sudo pacman -S python-fastapi python-uvicorn python-pyxdg
+sudo pacman -S python-fastapi python-uvicorn python-pyxdg python-pillow
 ```
 
 **On Debian / Ubuntu / Linux Mint / Pop!_OS**:
 ```bash
-sudo apt install python3-fastapi python3-uvicorn python3-xdg
+sudo apt install python3-fastapi python3-uvicorn python3-xdg python3-pil
 ```
 
 Alternatively, using pip:
 ```bash
-pip install fastapi uvicorn pyxdg
+pip install fastapi uvicorn pyxdg pillow
 ```
 
 ### 3. Launch AppIndex
