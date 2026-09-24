@@ -5,6 +5,7 @@ Serves the web dashboard, REST API, icon resolver, and desktop file inspector.
 
 import csv
 import io
+import json
 import mimetypes
 import os
 from typing import Optional
@@ -16,7 +17,7 @@ import xdg.IconTheme
 
 from scanner import scan_all_applications
 
-app = FastAPI(title="AppIndex", version="0.1.4")
+app = FastAPI(title="AppIndex", version="0.1.5")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -178,7 +179,9 @@ async def export_apps(format: str = Query("json")):
         ]
         writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
-        for app_item in apps:
+        # Sort applications by source label (e.g. Flatpak, Repo, AppImage) then by application name
+        sorted_apps = sorted(apps, key=lambda a: (a.get("source_label", "").lower(), a.get("name", "").lower()))
+        for app_item in sorted_apps:
             writer.writerow(app_item)
         output.seek(0)
         return StreamingResponse(
@@ -187,8 +190,10 @@ async def export_apps(format: str = Query("json")):
             headers={"Content-Disposition": "attachment; filename=installed_apps.csv"},
         )
 
+    # Format JSON with 2-space indentation for human readability
+    formatted_json = json.dumps(data, indent=2, ensure_ascii=False)
     return StreamingResponse(
-        io.BytesIO(str(data).encode("utf-8")),
+        io.BytesIO(formatted_json.encode("utf-8")),
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=installed_apps.json"},
     )
