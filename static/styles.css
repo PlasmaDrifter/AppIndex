@@ -605,13 +605,16 @@ body {
   text-overflow: ellipsis;
 }
 
-.app-generic-name {
-  font-size: 11px;
+.app-generic-name,
+.app-subtitle {
+  font-size: calc(11.5px * var(--font-scale, 1));
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
+  min-height: 16px;
+  line-height: 1.3;
 }
 
 .card-badges {

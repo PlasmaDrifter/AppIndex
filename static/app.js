@@ -440,25 +440,26 @@ async function loadApplications() {
   }
 }
 
-// Update counters in cards and tabs
+// Update counters in tabs
 function updateStatsUI() {
-  document.getElementById("stat-total").textContent = appStats.total ?? allApps.length;
-  document.getElementById("stat-menu").textContent = appStats.in_menu ?? 0;
-  document.getElementById("stat-rpm").textContent = appStats.repo_rpm ?? 0;
-  document.getElementById("stat-flatpak").textContent = appStats.flatpak ?? 0;
-  document.getElementById("stat-local").textContent = appStats.local_tool ?? 0;
-  document.getElementById("stat-appimage").textContent = appStats.appimage ?? 0;
-
-  // Tabs count badges
-  document.getElementById("count-all").textContent = appStats.total ?? allApps.length;
-  document.getElementById("count-menu").textContent = appStats.in_menu ?? 0;
-  document.getElementById("count-local").textContent = appStats.local_tool ?? 0;
-  document.getElementById("count-rpm").textContent = appStats.repo_rpm ?? 0;
-  document.getElementById("count-flatpak").textContent = appStats.flatpak ?? 0;
-  document.getElementById("count-appimage").textContent = appStats.appimage ?? 0;
-  document.getElementById("count-steam").textContent = appStats.steam ?? 0;
-  document.getElementById("count-unmanaged").textContent = appStats.unmanaged ?? 0;
-  document.getElementById("count-hidden").textContent = appStats.hidden ?? 0;
+  const countAll = document.getElementById("count-all");
+  if (countAll) countAll.textContent = appStats.total ?? allApps.length;
+  const countMenu = document.getElementById("count-menu");
+  if (countMenu) countMenu.textContent = appStats.in_menu ?? 0;
+  const countLocal = document.getElementById("count-local");
+  if (countLocal) countLocal.textContent = appStats.local_tool ?? 0;
+  const countRpm = document.getElementById("count-rpm");
+  if (countRpm) countRpm.textContent = appStats.repo_rpm ?? 0;
+  const countFlatpak = document.getElementById("count-flatpak");
+  if (countFlatpak) countFlatpak.textContent = appStats.flatpak ?? 0;
+  const countAppimage = document.getElementById("count-appimage");
+  if (countAppimage) countAppimage.textContent = appStats.appimage ?? 0;
+  const countSteam = document.getElementById("count-steam");
+  if (countSteam) countSteam.textContent = appStats.steam ?? 0;
+  const countUnmanaged = document.getElementById("count-unmanaged");
+  if (countUnmanaged) countUnmanaged.textContent = appStats.unmanaged ?? 0;
+  const countHidden = document.getElementById("count-hidden");
+  if (countHidden) countHidden.textContent = appStats.hidden ?? 0;
 }
 
 // Filter and sort applications
@@ -555,6 +556,11 @@ function renderCards(apps) {
 
     const versionSizeStr = [app.package_version, app.installed_size].filter(Boolean).join(" • ");
 
+    // Build unified, consistent subtitle across all cards
+    const subtitle = app.generic_name
+      ? (app.comment && app.comment !== app.generic_name ? `${app.generic_name} — ${app.comment}` : app.generic_name)
+      : (app.comment || "");
+
     card.innerHTML = `
       <div>
         <div class="card-top">
@@ -563,7 +569,7 @@ function renderCards(apps) {
             <div class="card-title-row">
               <h3 class="app-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</h3>
             </div>
-            ${app.generic_name ? `<div class="app-generic-name">${escapeHtml(app.generic_name)}</div>` : ""}
+            <div class="app-subtitle" title="${escapeHtml(subtitle || app.name)}">${escapeHtml(subtitle || "")}</div>
             <div class="card-badges">
               <span class="badge ${badgeClass}">${escapeHtml(app.source_label)}</span>
               <span class="badge ${menuBadgeClass}">${menuBadgeText}</span>
@@ -571,10 +577,6 @@ function renderCards(apps) {
             </div>
           </div>
         </div>
-
-        <p class="app-description" title="${escapeHtml(app.comment || "No description available")}">
-          ${escapeHtml(app.comment || "No description available")}
-        </p>
       </div>
 
       <div>
@@ -596,7 +598,7 @@ function renderCards(apps) {
         </div>
 
         ${app.uninstall_command ? `
-          <div class="card-uninstall-block" style="margin-top: 8px;">
+          <div class="card-uninstall-block" style="margin-top: 6px;">
             <code class="uninstall-code" title="${escapeHtml(app.uninstall_command)}">${escapeHtml(app.uninstall_command)}</code>
             <button class="copy-cmd-btn btn-copy-cmd">Copy</button>
           </div>
