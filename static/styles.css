@@ -641,7 +641,10 @@ body {
   color: var(--badge-flatpak-text);
 }
 
-.badge-source-repo_rpm {
+.badge-source-repo_rpm,
+.badge-source-repo_pacman,
+.badge-source-repo_apt,
+.badge-source-repo_system {
   background-color: var(--badge-rpm-bg);
   border: 1px solid var(--badge-rpm-border);
   color: var(--badge-rpm-text);

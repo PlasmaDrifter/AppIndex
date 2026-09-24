@@ -19,6 +19,8 @@ class TestScanner(unittest.TestCase):
         self.assertGreater(stats["total"], 0)
         self.assertGreater(stats["in_menu"], 0)
         self.assertGreater(stats["repo_rpm"], 0)
+        self.assertGreater(stats["repo_system"], 0)
+        self.assertIn("distro", stats)
         self.assertGreater(stats["flatpak"], 0)
         self.assertGreater(stats["local_tool"], 0)
 
@@ -30,6 +32,20 @@ class TestScanner(unittest.TestCase):
         ]
         for field in required_fields:
             self.assertIn(field, sample)
+
+    def test_distribution_info(self):
+        from scanner import get_distribution_info
+        info = get_distribution_info()
+        self.assertIn("name", info)
+        self.assertIn("pkg_manager", info)
+        self.assertIn("pkg_manager_type", info)
+        self.assertIn("uninstall_prefix", info)
+
+    def test_active_desktop_environments(self):
+        from scanner import get_active_desktop_environments
+        desktops = get_active_desktop_environments()
+        self.assertIsInstance(desktops, set)
+        self.assertGreater(len(desktops), 0)
 
     def test_parse_desktop_file(self):
         parsed = parse_desktop_file("/usr/share/applications/smplayer.desktop")

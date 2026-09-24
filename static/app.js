@@ -470,8 +470,12 @@ function updateStatsUI() {
   if (countMenu) countMenu.textContent = appStats.in_menu ?? 0;
   const countLocal = document.getElementById("count-local");
   if (countLocal) countLocal.textContent = appStats.local_tool ?? 0;
+  const repoPkgMgr = document.getElementById("repo-pkg-mgr");
+  if (repoPkgMgr && appStats.distro && appStats.distro.pkg_manager_label) {
+    repoPkgMgr.textContent = appStats.distro.pkg_manager_label;
+  }
   const countRpm = document.getElementById("count-rpm");
-  if (countRpm) countRpm.textContent = appStats.repo_rpm ?? 0;
+  if (countRpm) countRpm.textContent = appStats.repo_system ?? appStats.repo_rpm ?? 0;
   const countFlatpak = document.getElementById("count-flatpak");
   if (countFlatpak) countFlatpak.textContent = appStats.flatpak ?? 0;
   const countAppimage = document.getElementById("count-appimage");
@@ -494,6 +498,13 @@ function getFilteredApps() {
       if (app.in_menu) return false;
     } else if (currentSourceFilter === "in_menu") {
       if (!app.in_menu) return false;
+    } else if (currentSourceFilter === "repo_system" || currentSourceFilter === "repo_rpm") {
+      if (!app.source_type.startsWith("repo_")) {
+        return false;
+      }
+      if (!showHidden && !app.in_menu) {
+        return false;
+      }
     } else {
       if (currentSourceFilter !== "all" && app.source_type !== currentSourceFilter) {
         return false;
