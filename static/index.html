@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon.png">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.7">
 </head>
 <body>
   <div class="app-layout">
@@ -39,21 +39,14 @@
           <span>Rescan</span>
         </button>
 
-        <div class="dropdown">
-          <button id="btn-export" class="btn btn-outline btn-sm" title="Export inventory options">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            <span>Export</span>
-          </button>
-          <div class="dropdown-menu" id="export-menu">
-            <button type="button" id="btn-open-export-modal" class="dropdown-item">Export Options...</button>
-            <a href="/api/export?format=csv" download="installed_apps.csv" class="dropdown-item">Quick Export CSV</a>
-            <a href="/api/export?format=json" download="installed_apps.json" class="dropdown-item">Quick Export JSON</a>
-          </div>
-        </div>
+        <button id="btn-export" class="btn btn-outline btn-sm" title="Export applications">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Export</span>
+        </button>
         <button id="btn-settings" class="btn btn-outline btn-sm" title="Application Settings">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
@@ -436,7 +429,7 @@
     </div>
 
     <!-- Export Modal -->
-    <div id="export-modal" class="modal" style="display: none;">
+    <div id="export-modal" class="modal-backdrop" style="display: none;">
       <div class="modal-content export-modal-content">
         <div class="modal-header">
           <div class="modal-title-group">
@@ -615,6 +608,8 @@
           </div>
           <div class="export-footer-actions">
             <button type="button" id="export-cancel-btn" class="btn btn-secondary">Cancel</button>
+            <a href="/api/export?format=csv" download="installed_apps.csv" class="btn btn-outline btn-sm" id="btn-quick-csv">Quick CSV</a>
+            <a href="/api/export?format=json" download="installed_apps.json" class="btn btn-outline btn-sm" id="btn-quick-json">Quick JSON</a>
             <button type="button" id="btn-do-export" class="btn btn-primary">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -632,6 +627,6 @@
     <div id="toast" class="toast" style="display: none;"></div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=0.1.7"></script>
 </body>
 </html>

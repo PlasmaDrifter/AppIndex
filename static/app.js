@@ -1331,7 +1331,11 @@ function openExportModal() {
   const modal = document.getElementById("export-modal");
   if (modal) {
     modal.style.display = "flex";
-    updateExportSummary();
+    try {
+      updateExportSummary();
+    } catch (err) {
+      console.error("Error updating export summary:", err);
+    }
   }
 }
 
@@ -1366,13 +1370,15 @@ function updateExportSummary() {
   const { format, selectedSources, visibility, selectedFields } = getExportFilterState();
 
   let matchingCount = 0;
-  allApps.forEach((app) => {
-    const src = (app.source_type || "").toLowerCase();
-    if (!selectedSources.includes(src)) return;
-    if (visibility === "in_menu" && !app.in_menu) return;
-    if (visibility === "hidden" && app.in_menu) return;
-    matchingCount++;
-  });
+  if (Array.isArray(allApps)) {
+    allApps.forEach((app) => {
+      const src = (app.source_type || "").toLowerCase();
+      if (!selectedSources.includes(src)) return;
+      if (visibility === "in_menu" && !app.in_menu) return;
+      if (visibility === "hidden" && app.in_menu) return;
+      matchingCount++;
+    });
+  }
 
   const summaryEl = document.getElementById("export-summary-text");
   const btnLabelEl = document.getElementById("export-btn-label");
