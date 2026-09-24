@@ -459,8 +459,8 @@ function renderTable(apps) {
         <img class="table-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.src='/api/icon'">
       </td>
       <td>
-        <strong>${escapeHtml(app.name)}</strong>
-        ${app.generic_name ? `<div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(app.generic_name)}</div>` : ""}
+        <strong class="table-app-name">${escapeHtml(app.name)}</strong>
+        ${app.generic_name ? `<div class="table-app-generic">${escapeHtml(app.generic_name)}</div>` : ""}
       </td>
       <td>
         <span class="badge ${badgeClass}">${escapeHtml(app.source_label)}</span>
