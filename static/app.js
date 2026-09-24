@@ -170,21 +170,43 @@ const PRESET_THEMES = {
   "clean-light": {
     name: "Clean Light",
     colors: {
-      "--bg-primary": "#f5f7fb",
-      "--bg-secondary": "#e9edf5",
+      "--bg-primary": "#f8fafc",
+      "--bg-secondary": "#f1f5f9",
       "--bg-card": "#ffffff",
-      "--bg-card-hover": "#f0f4fa",
-      "--border-color": "#d5dbe7",
-      "--text-primary": "#1e2532",
-      "--text-secondary": "#49556a",
-      "--text-muted": "#768297",
+      "--bg-card-hover": "#f1f5f9",
+      "--bg-modal": "#ffffff",
+      "--bg-code": "#e2e8f0",
+      "--btn-primary-text": "#ffffff",
+      "--border-color": "#cbd5e1",
+      "--text-primary": "#0f172a",
+      "--text-secondary": "#334155",
+      "--text-muted": "#64748b",
       "--accent-blue": "#2563eb",
       "--accent-purple": "#7c3aed",
       "--accent-orange": "#ea580c",
       "--accent-green": "#16a34a",
-      "--accent-red": "#dc2626"
+      "--accent-red": "#dc2626",
+      "--accent-cyan": "#0284c7",
+      "--badge-rpm-bg": "rgba(37, 99, 235, 0.12)",
+      "--badge-rpm-border": "rgba(37, 99, 235, 0.35)",
+      "--badge-rpm-text": "#1d4ed8",
+      "--badge-flatpak-bg": "rgba(22, 163, 74, 0.12)",
+      "--badge-flatpak-border": "rgba(22, 163, 74, 0.35)",
+      "--badge-flatpak-text": "#15803d",
+      "--badge-local-bg": "rgba(202, 138, 4, 0.12)",
+      "--badge-local-border": "rgba(202, 138, 4, 0.35)",
+      "--badge-local-text": "#a16207",
+      "--badge-appimage-bg": "rgba(234, 88, 12, 0.12)",
+      "--badge-appimage-border": "rgba(234, 88, 12, 0.35)",
+      "--badge-appimage-text": "#c2410c",
+      "--badge-steam-bg": "rgba(124, 58, 237, 0.12)",
+      "--badge-steam-border": "rgba(124, 58, 237, 0.35)",
+      "--badge-steam-text": "#6d28d9",
+      "--badge-unmanaged-bg": "rgba(100, 116, 139, 0.12)",
+      "--badge-unmanaged-border": "rgba(100, 116, 139, 0.35)",
+      "--badge-unmanaged-text": "#334155"
     },
-    swatches: ["#f5f7fb", "#ffffff", "#2563eb", "#7c3aed"]
+    swatches: ["#f8fafc", "#ffffff", "#2563eb", "#7c3aed"]
   }
 };
 
@@ -891,6 +913,11 @@ function applyAllActiveSettings() {
 function applyThemeColors(colorsObj) {
   if (!colorsObj) return;
   const root = document.documentElement;
+  const savedFontScale = root.style.getPropertyValue("--font-scale");
+  root.removeAttribute("style");
+  if (savedFontScale) {
+    root.style.setProperty("--font-scale", savedFontScale);
+  }
   for (const [key, val] of Object.entries(colorsObj)) {
     root.style.setProperty(key, val);
   }
