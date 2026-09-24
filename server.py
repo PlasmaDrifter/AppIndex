@@ -17,7 +17,7 @@ import xdg.IconTheme
 
 from scanner import scan_all_applications
 
-app = FastAPI(title="AppIndex", version="0.1.7")
+app = FastAPI(title="AppIndex", version="0.1.8")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")

@@ -17,6 +17,9 @@ AppIndex is a lightweight, local web dashboard and system inspector that invento
 ### Application Inspector Modal
 ![AppIndex Application Inspector Modal](screenshots/appindex-inspection-modal.png)
 
+### Customizable Export Modal
+![AppIndex Export Inventory Modal](screenshots/appindex-export-modal.png)
+
 ---
 
 ## Supported Package Formats & Sources
