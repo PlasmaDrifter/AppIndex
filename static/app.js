@@ -112,8 +112,8 @@ function setupEventListeners() {
     });
   });
 
-  // Stat cards clicking
-  document.querySelectorAll(".stat-card").forEach((card) => {
+  // Stat pills and cards clicking
+  document.querySelectorAll(".stat-pill, .stat-card").forEach((card) => {
     card.addEventListener("click", () => {
       const filter = card.dataset.filter;
       const targetTab = document.querySelector(`.tab-btn[data-source="${filter}"]`);
