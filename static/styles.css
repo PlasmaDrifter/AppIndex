@@ -1259,6 +1259,24 @@ body.density-spacious .app-icon {
   gap: 18px;
 }
 
+.modal-footer {
+  padding: 14px 24px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+#settings-done-btn {
+  padding: 8px 24px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
 .settings-section {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
