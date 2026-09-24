@@ -22,6 +22,7 @@ const categoryFilter = document.getElementById("category-filter");
 const sortBy = document.getElementById("sort-by");
 const viewCardsBtn = document.getElementById("view-cards-btn");
 const viewTableBtn = document.getElementById("view-table-btn");
+const toggleHidden = document.getElementById("toggle-hidden");
 const btnRefresh = document.getElementById("btn-refresh");
 const btnExport = document.getElementById("btn-export");
 const exportMenu = document.getElementById("export-menu");
@@ -82,6 +83,13 @@ function setupEventListeners() {
     currentSort = e.target.value;
     renderApplications();
   });
+
+  // Toggle Hidden Apps
+  if (toggleHidden) {
+    toggleHidden.addEventListener("change", () => {
+      renderApplications();
+    });
+  }
 
   // View toggle
   viewCardsBtn.addEventListener("click", () => {
@@ -258,14 +266,21 @@ function updateStatsUI() {
 
 // Filter and sort applications
 function getFilteredApps() {
+  const showHidden = toggleHidden ? toggleHidden.checked : false;
+
   return allApps.filter((app) => {
     // Source / Menu Filter
-    if (currentSourceFilter === "in_menu") {
-      if (!app.in_menu) return false;
-    } else if (currentSourceFilter === "hidden") {
+    if (currentSourceFilter === "hidden") {
       if (app.in_menu) return false;
-    } else if (currentSourceFilter !== "all") {
-      if (app.source_type !== currentSourceFilter) return false;
+    } else if (currentSourceFilter === "in_menu") {
+      if (!app.in_menu) return false;
+    } else {
+      if (currentSourceFilter !== "all" && app.source_type !== currentSourceFilter) {
+        return false;
+      }
+      if (!showHidden && !app.in_menu) {
+        return false;
+      }
     }
 
     // Category Filter

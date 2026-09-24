@@ -432,7 +432,7 @@ def scan_all_applications() -> Dict[str, Any]:
 
             if rpm_info:
                 source_type = "repo_rpm"
-                source_label = "Fedora/Nobara Repo (RPM)"
+                source_label = "Nobara Repo (RPM)"
                 package_name = rpm_info["name"]
                 package_version = rpm_info["version"]
                 package_arch = rpm_info["arch"]
@@ -452,7 +452,7 @@ def scan_all_applications() -> Dict[str, Any]:
         elif path in file_to_rpm:
             rpm_info = file_to_rpm[path]
             source_type = "repo_rpm"
-            source_label = "Fedora/Nobara Repo (RPM)"
+            source_label = "Nobara Repo (RPM)"
             package_name = rpm_info["name"]
             package_version = rpm_info["version"]
             package_arch = rpm_info["arch"]
