@@ -1,5 +1,5 @@
 """
-App Menu Inspector - FastAPI Server
+AppIndex - FastAPI Server
 Serves the web dashboard, REST API, icon resolver, and desktop file inspector.
 """
 
@@ -16,7 +16,7 @@ import xdg.IconTheme
 
 from scanner import scan_all_applications
 
-app = FastAPI(title="App Menu Inspector", version="1.0.0")
+app = FastAPI(title="AppIndex", version="0.1.0")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -81,7 +81,7 @@ async def serve_index():
     index_file = os.path.join(STATIC_DIR, "index.html")
     if os.path.isfile(index_file):
         return FileResponse(index_file)
-    return HTMLResponse("<h1>App Menu Inspector</h1><p>Frontend file missing.</p>")
+    return HTMLResponse("<h1>AppIndex</h1><p>Frontend file missing.</p>")
 
 
 @app.get("/api/apps")
@@ -198,7 +198,7 @@ def start_server(host: str = "127.0.0.1", port: int = 8765):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="App Menu Inspector Web Server")
+    parser = argparse.ArgumentParser(description="AppIndex Web Server")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="Port to bind (default: 8765)")
     args = parser.parse_args()

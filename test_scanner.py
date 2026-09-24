@@ -1,5 +1,5 @@
 """
-Unit and integration tests for App Menu Inspector
+Unit and integration tests for AppIndex
 """
 
 import unittest

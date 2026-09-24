@@ -1,5 +1,5 @@
 /**
- * App Menu Inspector - Frontend Application Logic
+ * AppIndex - Frontend Application Logic
  */
 
 let allApps = [];
@@ -49,7 +49,8 @@ const btnToggleRaw = document.getElementById("btn-toggle-raw");
 const rawDesktopContent = document.getElementById("raw-desktop-content");
 
 // Settings & Theme Presets
-const STORAGE_KEY = "app_menu_inspector_settings_v1";
+const STORAGE_KEY = "appindex_settings_v1";
+const LEGACY_STORAGE_KEY = "app_menu_inspector_settings_v1";
 
 const PRESET_THEMES = {
   "catppuccin": {
@@ -833,7 +834,7 @@ function escapeHtml(str) {
 
 function loadSavedSettings() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       userSettings = {

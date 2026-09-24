@@ -1,5 +1,5 @@
 """
-App Menu Inspector - Application Scanner Module
+AppIndex - Application Scanner Module
 Discovers all desktop menu entries and installed applications.
 Classifies installation source (Repo/RPM, Flatpak, AppImage, Steam, Local scripts, Web Apps)
 and extracts package names and uninstall commands.
