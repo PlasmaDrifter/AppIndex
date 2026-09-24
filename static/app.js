@@ -363,10 +363,97 @@ function setupEventListeners() {
     }
   });
 
-  // Export dropdown
-  btnExport.addEventListener("click", (e) => {
-    e.stopPropagation();
-    btnExport.parentElement.classList.toggle("open");
+  // Export controls
+  const exportModalElem = document.getElementById("export-modal");
+  const exportCloseElem = document.getElementById("export-close-btn");
+  const exportCancelElem = document.getElementById("export-cancel-btn");
+  const btnOpenExportModal = document.getElementById("btn-open-export-modal");
+  const btnDoExport = document.getElementById("btn-do-export");
+
+  if (btnExport) {
+    btnExport.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openExportModal();
+    });
+  }
+
+  if (btnOpenExportModal) {
+    btnOpenExportModal.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (btnExport && btnExport.parentElement) {
+        btnExport.parentElement.classList.remove("open");
+      }
+      openExportModal();
+    });
+  }
+
+  if (exportCloseElem) exportCloseElem.addEventListener("click", closeExportModal);
+  if (exportCancelElem) exportCancelElem.addEventListener("click", closeExportModal);
+  if (exportModalElem) {
+    exportModalElem.addEventListener("click", (e) => {
+      if (e.target === exportModalElem) closeExportModal();
+    });
+  }
+
+  if (btnDoExport) {
+    btnDoExport.addEventListener("click", executeCustomExport);
+  }
+
+  // Format cards toggle
+  document.querySelectorAll('input[name="export-format"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      document.querySelectorAll(".export-format-card").forEach((card) => {
+        const r = card.querySelector('input[type="radio"]');
+        card.classList.toggle("active", r && r.checked);
+      });
+      updateExportSummary();
+    });
+  });
+
+  // Source selection helper buttons
+  const btnExportSourcesAll = document.getElementById("btn-export-sources-all");
+  const btnExportSourcesNone = document.getElementById("btn-export-sources-none");
+  if (btnExportSourcesAll) {
+    btnExportSourcesAll.addEventListener("click", () => {
+      document.querySelectorAll('input[name="export-source"]').forEach((cb) => (cb.checked = true));
+      updateExportSummary();
+    });
+  }
+  if (btnExportSourcesNone) {
+    btnExportSourcesNone.addEventListener("click", () => {
+      document.querySelectorAll('input[name="export-source"]').forEach((cb) => (cb.checked = false));
+      updateExportSummary();
+    });
+  }
+
+  // Fields selection helper buttons
+  const btnExportFieldsDefault = document.getElementById("btn-export-fields-default");
+  const btnExportFieldsAll = document.getElementById("btn-export-fields-all");
+  const btnExportFieldsNone = document.getElementById("btn-export-fields-none");
+  if (btnExportFieldsDefault) {
+    btnExportFieldsDefault.addEventListener("click", () => {
+      document.querySelectorAll('input[name="export-field"]').forEach((cb) => {
+        cb.checked = cb.dataset.default === "true";
+      });
+      updateExportSummary();
+    });
+  }
+  if (btnExportFieldsAll) {
+    btnExportFieldsAll.addEventListener("click", () => {
+      document.querySelectorAll('input[name="export-field"]').forEach((cb) => (cb.checked = true));
+      updateExportSummary();
+    });
+  }
+  if (btnExportFieldsNone) {
+    btnExportFieldsNone.addEventListener("click", () => {
+      document.querySelectorAll('input[name="export-field"]').forEach((cb) => (cb.checked = false));
+      updateExportSummary();
+    });
+  }
+
+  // Live change updates for filters and fields
+  document.querySelectorAll('input[name="export-source"], input[name="export-visibility"], input[name="export-field"]').forEach((input) => {
+    input.addEventListener("change", updateExportSummary);
   });
 
   document.addEventListener("click", () => {
@@ -393,6 +480,7 @@ function setupEventListeners() {
     if (e.key === "Escape") {
       if (detailModal && detailModal.style.display !== "none") closeModal();
       if (settingsModal && settingsModal.style.display !== "none") closeSettingsModal();
+      if (exportModalElem && exportModalElem.style.display !== "none") closeExportModal();
     }
   });
 
@@ -1233,4 +1321,101 @@ function closeSettingsModal() {
   if (modal) {
     modal.style.display = "none";
   }
+}
+
+// ==========================================
+// Custom Export Options Logic
+// ==========================================
+
+function openExportModal() {
+  const modal = document.getElementById("export-modal");
+  if (modal) {
+    modal.style.display = "flex";
+    updateExportSummary();
+  }
+}
+
+function closeExportModal() {
+  const modal = document.getElementById("export-modal");
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+function getExportFilterState() {
+  const format = document.querySelector('input[name="export-format"]:checked')?.value || "csv";
+
+  const sourceCheckboxes = document.querySelectorAll('input[name="export-source"]:checked');
+  const selectedSources = [];
+  sourceCheckboxes.forEach((cb) => {
+    cb.value.split(",").forEach((s) => {
+      const trimmed = s.trim().toLowerCase();
+      if (trimmed && !selectedSources.includes(trimmed)) selectedSources.push(trimmed);
+    });
+  });
+
+  const visibility = document.querySelector('input[name="export-visibility"]:checked')?.value || "all";
+
+  const fieldCheckboxes = document.querySelectorAll('input[name="export-field"]:checked');
+  const selectedFields = Array.from(fieldCheckboxes).map((cb) => cb.value);
+
+  return { format, selectedSources, visibility, selectedFields };
+}
+
+function updateExportSummary() {
+  const { format, selectedSources, visibility, selectedFields } = getExportFilterState();
+
+  let matchingCount = 0;
+  allApps.forEach((app) => {
+    const src = (app.source_type || "").toLowerCase();
+    if (!selectedSources.includes(src)) return;
+    if (visibility === "in_menu" && !app.in_menu) return;
+    if (visibility === "hidden" && app.in_menu) return;
+    matchingCount++;
+  });
+
+  const summaryEl = document.getElementById("export-summary-text");
+  const btnLabelEl = document.getElementById("export-btn-label");
+  const doExportBtn = document.getElementById("btn-do-export");
+
+  if (summaryEl) {
+    summaryEl.textContent = `Will export ${matchingCount} application${matchingCount === 1 ? "" : "s"} with ${selectedFields.length} field${selectedFields.length === 1 ? "" : "s"} as ${format.toUpperCase()}`;
+  }
+  if (btnLabelEl) {
+    btnLabelEl.textContent = `Download ${format.toUpperCase()}`;
+  }
+  if (doExportBtn) {
+    doExportBtn.disabled = matchingCount === 0 || selectedFields.length === 0;
+  }
+}
+
+function executeCustomExport() {
+  const { format, selectedSources, visibility, selectedFields } = getExportFilterState();
+  if (selectedFields.length === 0) {
+    showToast("Please select at least one field to export");
+    return;
+  }
+  if (selectedSources.length === 0) {
+    showToast("Please select at least one package source to export");
+    return;
+  }
+
+  const params = new URLSearchParams();
+  params.set("format", format);
+  params.set("fields", selectedFields.join(","));
+  params.set("sources", selectedSources.join(","));
+  params.set("visibility", visibility);
+
+  const exportUrl = `/api/export?${params.toString()}`;
+  const filename = `installed_apps.${format}`;
+
+  const link = document.createElement("a");
+  link.href = exportUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  closeExportModal();
+  showToast(`Downloading custom ${format.toUpperCase()} export...`);
 }

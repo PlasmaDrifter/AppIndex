@@ -96,6 +96,31 @@ class TestAPI(unittest.TestCase):
         self.assertIn("text/csv", response.headers.get("content-type", ""))
         self.assertIn("package_name", response.text)
 
+    def test_export_csv_custom_fields(self):
+        response = self.client.get("/api/export?format=csv&fields=name,package_name")
+        self.assertEqual(response.status_code, 200)
+        first_line = response.text.splitlines()[0]
+        self.assertEqual(first_line.strip(), "name,package_name")
+
+    def test_export_json_custom_fields(self):
+        response = self.client.get("/api/export?format=json&fields=name,installed_size")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("applications", data)
+        if len(data["applications"]) > 0:
+            app_keys = set(data["applications"][0].keys())
+            self.assertEqual(app_keys, {"name", "installed_size"})
+
+    def test_export_source_filter(self):
+        response = self.client.get("/api/export?format=csv&sources=flatpak")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response.headers.get("content-type", ""))
+
+    def test_export_visibility_filter(self):
+        response = self.client.get("/api/export?format=csv&visibility=in_menu")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response.headers.get("content-type", ""))
+
     def test_favicon_endpoint(self):
         response = self.client.get("/favicon.ico")
         self.assertEqual(response.status_code, 200)

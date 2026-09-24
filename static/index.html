@@ -40,7 +40,7 @@
         </button>
 
         <div class="dropdown">
-          <button id="btn-export" class="btn btn-outline btn-sm" title="Export inventory">
+          <button id="btn-export" class="btn btn-outline btn-sm" title="Export inventory options">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -49,8 +49,9 @@
             <span>Export</span>
           </button>
           <div class="dropdown-menu" id="export-menu">
-            <a href="/api/export?format=csv" download="installed_apps.csv" class="dropdown-item">Export as CSV</a>
-            <a href="/api/export?format=json" download="installed_apps.json" class="dropdown-item">Export as JSON</a>
+            <button type="button" id="btn-open-export-modal" class="dropdown-item">Export Options...</button>
+            <a href="/api/export?format=csv" download="installed_apps.csv" class="dropdown-item">Quick Export CSV</a>
+            <a href="/api/export?format=json" download="installed_apps.json" class="dropdown-item">Quick Export JSON</a>
           </div>
         </div>
         <button id="btn-settings" class="btn btn-outline btn-sm" title="Application Settings">
@@ -430,6 +431,199 @@
 
         <div class="modal-footer">
           <button id="settings-done-btn" class="btn btn-primary">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="export-modal" class="modal" style="display: none;">
+      <div class="modal-content export-modal-content">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <div class="modal-title-text">
+              <h2>Export Inventory</h2>
+              <span class="modal-subtitle">Choose format, package sources, and fields to export</span>
+            </div>
+          </div>
+          <button id="export-close-btn" class="modal-close" title="Close dialog">&times;</button>
+        </div>
+
+        <div class="export-modal-body">
+          <!-- Section 1: File Format -->
+          <div class="settings-section">
+            <h3 class="settings-section-title">1. File Format</h3>
+            <p class="settings-section-desc">Select the output format for the exported catalog.</p>
+            <div class="export-format-selector">
+              <label class="export-format-card active" id="format-card-csv">
+                <input type="radio" name="export-format" value="csv" checked>
+                <div class="export-format-info">
+                  <span class="export-format-title">CSV (.csv)</span>
+                  <span class="export-format-sub">Spreadsheet-ready, sorted by source &amp; application name</span>
+                </div>
+              </label>
+              <label class="export-format-card" id="format-card-json">
+                <input type="radio" name="export-format" value="json">
+                <div class="export-format-info">
+                  <span class="export-format-title">JSON (.json)</span>
+                  <span class="export-format-sub">Structured data array with selected fields</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Section 2: Package Sources & Scope -->
+          <div class="settings-section">
+            <div class="section-title-row">
+              <div>
+                <h3 class="settings-section-title">2. Package Sources &amp; Scope</h3>
+                <p class="settings-section-desc">Filter which types of applications are included.</p>
+              </div>
+              <div class="export-actions-row">
+                <button type="button" id="btn-export-sources-all" class="btn btn-outline btn-xs">All</button>
+                <button type="button" id="btn-export-sources-none" class="btn btn-outline btn-xs">None</button>
+              </div>
+            </div>
+            <div class="export-checkbox-grid" id="export-sources-grid">
+              <label class="export-check-item">
+                <input type="checkbox" name="export-source" value="repo_rpm,repo_pacman,repo_apt" checked>
+                <span>Native Repositories</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-source" value="flatpak" checked>
+                <span>Flatpak</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-source" value="appimage" checked>
+                <span>AppImage</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-source" value="steam" checked>
+                <span>Steam Games</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-source" value="local_tool" checked>
+                <span>Local Tools</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-source" value="unmanaged,web_app" checked>
+                <span>Unmanaged &amp; Web Apps</span>
+              </label>
+            </div>
+
+            <div class="export-visibility-row">
+              <span class="export-visibility-label">Visibility:</span>
+              <label class="export-radio-item">
+                <input type="radio" name="export-visibility" value="all" checked>
+                <span>All Applications</span>
+              </label>
+              <label class="export-radio-item">
+                <input type="radio" name="export-visibility" value="in_menu">
+                <span>In Menu Only</span>
+              </label>
+              <label class="export-radio-item">
+                <input type="radio" name="export-visibility" value="hidden">
+                <span>Hidden / Background Only</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Section 3: Fields & Columns -->
+          <div class="settings-section">
+            <div class="section-title-row">
+              <div>
+                <h3 class="settings-section-title">3. Fields &amp; Columns</h3>
+                <p class="settings-section-desc">Select which columns to include in the export.</p>
+              </div>
+              <div class="export-actions-row">
+                <button type="button" id="btn-export-fields-default" class="btn btn-outline btn-xs">Defaults</button>
+                <button type="button" id="btn-export-fields-all" class="btn btn-outline btn-xs">All</button>
+                <button type="button" id="btn-export-fields-none" class="btn btn-outline btn-xs">Clear</button>
+              </div>
+            </div>
+            <div class="export-checkbox-grid" id="export-fields-grid">
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="name" checked data-default="true">
+                <span>Application Name (name)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="source_label" checked data-default="true">
+                <span>Source Label (source_label)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="package_name" checked data-default="true">
+                <span>Package Name (package_name)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="package_version" checked data-default="true">
+                <span>Version (package_version)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="installed_size" checked data-default="true">
+                <span>Installed Size (installed_size)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="in_menu" checked data-default="true">
+                <span>Menu Visible (in_menu)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="primary_category" checked data-default="true">
+                <span>Primary Category (primary_category)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="exec_command" checked data-default="true">
+                <span>Exec Command (exec_command)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="desktop_path" checked data-default="true">
+                <span>Desktop Path (desktop_path)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="uninstall_command" checked data-default="true">
+                <span>Uninstall Command (uninstall_command)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="generic_name">
+                <span>Generic Name (generic_name)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="comment">
+                <span>Comment / Description (comment)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="package_arch">
+                <span>Architecture (package_arch)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="source_type">
+                <span>Source Type (source_type)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="categories">
+                <span>All Categories (categories)</span>
+              </label>
+              <label class="export-check-item">
+                <input type="checkbox" name="export-field" value="uninstall_note">
+                <span>Uninstall Note (uninstall_note)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer export-modal-footer">
+          <div class="export-summary-text" id="export-summary-text">
+            Calculating export summary...
+          </div>
+          <div class="export-footer-actions">
+            <button type="button" id="export-cancel-btn" class="btn btn-secondary">Cancel</button>
+            <button type="button" id="btn-do-export" class="btn btn-primary">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span id="export-btn-label">Download CSV</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

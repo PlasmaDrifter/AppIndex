@@ -190,7 +190,7 @@ Comment=Inspect installed applications, package managers, and uninstall commands
 Exec=sh -c '"$HOME/Scripts/appindex.sh" launch'
 Icon=utilities-terminal
 Terminal=false
-Categories=LocalTools;
+Categories=Utility;System;
 Keywords=apps;packages;inventory;uninstall;flatpak;appimage;rpm;pacman;apt;steam;pwa;
 ```
 
@@ -204,7 +204,7 @@ Keywords=apps;packages;inventory;uninstall;flatpak;appimage;rpm;pacman;apt;steam
 | `/api/icon?name=<icon_name>` | `GET` | Resolves and serves application icons via XDG theme lookup |
 | `/api/desktop-content?path=<path>` | `GET` | Returns raw text content of a local `.desktop` file |
 | `/api/refresh` | `POST` | Invalidates in-memory cache and triggers a full system rescan |
-| `/api/export?format=csv\|json` | `GET` | Downloads catalog as a CSV or JSON file |
+| `/api/export?format=csv\|json&fields=...&sources=...&visibility=...` | `GET` | Downloads catalog as a CSV or JSON file with optional column, package source, and visibility filters |
 | `/favicon.ico` | `GET`, `HEAD` | Serves application favicon |
 
 ---

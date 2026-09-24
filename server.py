@@ -17,7 +17,7 @@ import xdg.IconTheme
 
 from scanner import scan_all_applications
 
-app = FastAPI(title="AppIndex", version="0.1.6")
+app = FastAPI(title="AppIndex", version="0.1.7")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -157,30 +157,64 @@ async def get_desktop_content(path: str = Query(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+DEFAULT_EXPORT_FIELDS = [
+    "name",
+    "source_label",
+    "package_name",
+    "package_version",
+    "installed_size",
+    "in_menu",
+    "primary_category",
+    "exec_command",
+    "desktop_path",
+    "uninstall_command",
+]
+
+
 @app.get("/api/export")
-async def export_apps(format: str = Query("json")):
-    """Export application inventory as JSON or CSV."""
+async def export_apps(
+    format: str = Query("json"),
+    fields: Optional[str] = Query(None, description="Comma-separated list of field names to export"),
+    sources: Optional[str] = Query(None, description="Comma-separated list of source types to export"),
+    visibility: Optional[str] = Query("all", description="Filter by visibility: 'all', 'in_menu', or 'hidden'"),
+):
+    """Export application inventory as JSON or CSV with optional field, source, and visibility filtering."""
     data = get_cached_or_scan(force_refresh=False)
-    apps = data.get("applications", [])
+    apps = list(data.get("applications", []))
+
+    # Filter by source types if specified
+    if sources and sources.strip() and sources.strip().lower() != "all":
+        wanted_sources = {s.strip().lower() for s in sources.split(",") if s.strip()}
+        apps = [
+            a for a in apps
+            if a.get("source_type", "").lower() in wanted_sources
+            or a.get("source_label", "").lower() in wanted_sources
+        ]
+
+    # Filter by menu visibility if specified
+    if visibility:
+        vis = visibility.strip().lower()
+        if vis in ("in_menu", "menu", "visible"):
+            apps = [a for a in apps if a.get("in_menu") is True]
+        elif vis in ("hidden", "no_display"):
+            apps = [a for a in apps if a.get("in_menu") is False]
+
+    # Sort applications by source label then by application name
+    sorted_apps = sorted(
+        apps,
+        key=lambda a: (str(a.get("source_label", "")).lower(), str(a.get("name", "")).lower()),
+    )
+
+    # Determine export field list
+    if fields and fields.strip():
+        selected_fields = [f.strip() for f in fields.split(",") if f.strip()]
+    else:
+        selected_fields = DEFAULT_EXPORT_FIELDS
 
     if format.lower() == "csv":
         output = io.StringIO()
-        fieldnames = [
-            "name",
-            "source_label",
-            "package_name",
-            "package_version",
-            "installed_size",
-            "in_menu",
-            "primary_category",
-            "exec_command",
-            "desktop_path",
-            "uninstall_command",
-        ]
-        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(output, fieldnames=selected_fields, extrasaction="ignore")
         writer.writeheader()
-        # Sort applications by source label (e.g. Flatpak, Repo, AppImage) then by application name
-        sorted_apps = sorted(apps, key=lambda a: (a.get("source_label", "").lower(), a.get("name", "").lower()))
         for app_item in sorted_apps:
             writer.writerow(app_item)
         output.seek(0)
@@ -190,8 +224,22 @@ async def export_apps(format: str = Query("json")):
             headers={"Content-Disposition": "attachment; filename=installed_apps.csv"},
         )
 
-    # Format JSON with 2-space indentation for human readability
-    formatted_json = json.dumps(data, indent=2, ensure_ascii=False)
+    # JSON export
+    if fields and fields.strip():
+        export_apps_list = [
+            {k: app_item.get(k) for k in selected_fields}
+            for app_item in sorted_apps
+        ]
+    else:
+        export_apps_list = sorted_apps
+
+    export_payload = {
+        "generated_at": data.get("generated_at"),
+        "total_exported": len(export_apps_list),
+        "applications": export_apps_list,
+    }
+
+    formatted_json = json.dumps(export_payload, indent=2, ensure_ascii=False)
     return StreamingResponse(
         io.BytesIO(formatted_json.encode("utf-8")),
         media_type="application/json",
