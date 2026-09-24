@@ -261,7 +261,9 @@ def scan_all_applications() -> Dict[str, Any]:
     flatpak_apps = get_flatpak_installed()
 
     desktop_records = []
+    seen_desktop_filenames = {}
     seen_system_files = set()
+    shadowed_system_files = []
 
     for scope, directory in DESKTOP_DIRS:
         if not os.path.exists(directory):
@@ -274,25 +276,37 @@ def scan_all_applications() -> Dict[str, Any]:
                 if not os.path.isfile(full_path):
                     continue
 
+                # If this desktop file was already seen from a higher-priority directory, mark override and skip duplicate
+                if item in seen_desktop_filenames:
+                    existing = seen_desktop_filenames[item]
+                    existing["shadowed_paths"].append(full_path)
+                    existing["is_override"] = True
+                    if full_path.startswith("/usr/"):
+                        shadowed_system_files.append(full_path)
+                    continue
+
                 parsed = parse_desktop_file(full_path)
                 if not parsed:
                     continue
 
-                desktop_records.append(
-                    {
-                        "scope": scope,
-                        "filename": item,
-                        "path": full_path,
-                        "data": parsed,
-                    }
-                )
+                rec = {
+                    "scope": scope,
+                    "filename": item,
+                    "path": full_path,
+                    "data": parsed,
+                    "shadowed_paths": [],
+                    "is_override": False,
+                }
+                desktop_records.append(rec)
+                seen_desktop_filenames[item] = rec
+
                 if scope in ("system", "system_local"):
                     seen_system_files.add(full_path)
         except Exception:
             pass
 
-    # Collect files to query against RPM
-    rpm_query_files = list(seen_system_files)
+    # Collect files to query against RPM (including shadowed system files)
+    rpm_query_files = list(seen_system_files) + shadowed_system_files
     local_binaries_map = {}
     for rec in desktop_records:
         if rec["scope"] == "local_user":
@@ -317,6 +331,7 @@ def scan_all_applications() -> Dict[str, Any]:
         fname = rec["filename"]
         scope = rec["scope"]
         data = rec["data"]
+        shadowed = rec.get("shadowed_paths", [])
 
         exec_cmd = data["exec_cmd"]
         primary_exe = extract_executable(exec_cmd) or ""
@@ -329,11 +344,14 @@ def scan_all_applications() -> Dict[str, Any]:
         installed_size = ""
         uninstall_command = ""
         uninstall_note = ""
-        is_override = False
+        is_override = rec.get("is_override", False)
 
-        # Check if Flatpak
+        # Check if Flatpak (either direct in flatpak exports or shadowing a flatpak export)
         flatpak_id = None
+        has_flatpak_shadow = any("/flatpak/exports/" in sp for sp in shadowed)
         if scope in ("flatpak_system", "flatpak_user"):
+            flatpak_id = fname.replace(".desktop", "")
+        elif has_flatpak_shadow:
             flatpak_id = fname.replace(".desktop", "")
         elif data.get("x_flatpak"):
             flatpak_id = data["x_flatpak"]
@@ -361,6 +379,8 @@ def scan_all_applications() -> Dict[str, Any]:
             else:
                 uninstall_command = f"flatpak uninstall {flatpak_id}"
             uninstall_note = f"Remove flatpak app {flatpak_id}"
+            if is_override:
+                uninstall_note += " (Customized menu entry overrides system flatpak)"
 
         # Check if Steam Game
         elif "steam steam://rungameid/" in exec_cmd:
@@ -402,10 +422,13 @@ def scan_all_applications() -> Dict[str, Any]:
             uninstall_command = f'rm -f "{path}"'
             uninstall_note = "Removes the web application desktop shortcut"
 
-        # Check if Local User Script / Tool
+        # Check if Local User Script / Tool or Local Override of RPM
         elif scope == "local_user":
             resolved_rpm_file = local_binaries_map.get(path)
-            rpm_info = file_to_rpm.get(resolved_rpm_file) if resolved_rpm_file else None
+            # Also check if shadowed system file is owned by RPM
+            shadowed_rpm_file = next((sp for sp in shadowed if sp in file_to_rpm), None)
+            rpm_target = resolved_rpm_file if resolved_rpm_file in file_to_rpm else shadowed_rpm_file
+            rpm_info = file_to_rpm.get(rpm_target) if rpm_target else None
 
             if rpm_info:
                 source_type = "repo_rpm"
@@ -415,7 +438,7 @@ def scan_all_applications() -> Dict[str, Any]:
                 package_arch = rpm_info["arch"]
                 installed_size = rpm_info.get("size", "")
                 uninstall_command = f"sudo dnf remove {package_name}"
-                uninstall_note = f"User override of repo package {package_name}"
+                uninstall_note = f"Customized local menu entry overriding system package {package_name}"
                 is_override = True
             else:
                 source_type = "local_tool"
