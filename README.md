@@ -4,6 +4,14 @@ Linux Application & Package Inventory Inspector
 
 AppIndex is a lightweight, local web dashboard and system inspector that inventories all applications installed across your Linux system. It parses XDG desktop entries, attributes each application to its underlying package manager or installation source, displays exact package identifiers, and provides one-click copyable uninstall commands.
 
+## Screenshots
+
+### Table View
+![AppIndex Table View](screenshots/appindex-table-view.png)
+
+### Card Grid View
+![AppIndex Card Grid View](screenshots/appindex-cards-view.png)
+
 ## Key Features
 
 - **Multi-Source Detection**: Accurately classifies applications by their installation origin:
