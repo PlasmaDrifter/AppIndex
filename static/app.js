@@ -8,7 +8,7 @@ let currentSourceFilter = "all";
 let currentCategoryFilter = "all";
 let currentSort = "name_asc";
 let currentSearchTerm = "";
-let currentViewMode = "cards"; // "cards" or "table"
+let currentViewMode = "table"; // "cards" or "table"
 
 // DOM Elements
 const loadingSpinner = document.getElementById("loading-spinner");
@@ -438,7 +438,6 @@ function renderTable(apps) {
       : "/api/icon";
 
     const badgeClass = `badge-source-${app.source_type}`;
-    const versionSizeStr = [app.package_version, app.installed_size].filter(Boolean).join(" • ");
 
     tr.innerHTML = `
       <td>
@@ -452,12 +451,27 @@ function renderTable(apps) {
         <span class="badge ${badgeClass}">${escapeHtml(app.source_label)}</span>
       </td>
       <td>
-        <code style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-blue);">
-          ${escapeHtml(app.package_name || "N/A")}
-        </code>
+        <div class="table-pkg-cell">
+          <code class="table-pkg-code" title="${escapeHtml(app.package_name || "")}">
+            ${escapeHtml(app.package_name || "N/A")}
+          </code>
+          ${app.package_name ? `
+            <button class="copy-icon-btn btn-table-copy-pkg" title="Copy package name">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          ` : ""}
+        </div>
       </td>
-      <td style="font-size: 12px; color: var(--text-muted);">
-        ${escapeHtml(versionSizeStr || "-")}
+      <td>
+        ${app.uninstall_command ? `
+          <div class="table-cmd-cell">
+            <code class="table-cmd-code" title="${escapeHtml(app.uninstall_command)}">${escapeHtml(app.uninstall_command)}</code>
+            <button class="copy-cmd-btn btn-table-copy" title="Copy uninstall command">Copy</button>
+          </div>
+        ` : `<span style="color: var(--text-muted);">-</span>`}
       </td>
       <td>
         <span class="badge ${app.in_menu ? "badge-menu" : "badge-hidden"}">
@@ -465,14 +479,16 @@ function renderTable(apps) {
         </span>
       </td>
       <td>
-        ${app.uninstall_command ? `
-          <button class="copy-cmd-btn btn-table-copy" title="${escapeHtml(app.uninstall_command)}">Copy Command</button>
-        ` : "-"}
-      </td>
-      <td>
         <button class="btn btn-outline btn-sm btn-table-inspect">Inspect</button>
       </td>
     `;
+
+    const btnTableCopyPkg = tr.querySelector(".btn-table-copy-pkg");
+    if (btnTableCopyPkg) {
+      btnTableCopyPkg.addEventListener("click", () => {
+        copyToClipboard(app.package_name, "Package name copied: " + app.package_name);
+      });
+    }
 
     const btnTableCopy = tr.querySelector(".btn-table-copy");
     if (btnTableCopy) {

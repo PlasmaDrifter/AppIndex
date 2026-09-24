@@ -129,7 +129,7 @@
           </div>
 
           <div class="view-toggle">
-            <button id="view-cards-btn" class="view-btn active" title="Card view">
+            <button id="view-cards-btn" class="view-btn" title="Card view">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7"></rect>
                 <rect x="14" y="3" width="7" height="7"></rect>
@@ -137,7 +137,7 @@
                 <rect x="3" y="14" width="7" height="7"></rect>
               </svg>
             </button>
-            <button id="view-table-btn" class="view-btn" title="Table view">
+            <button id="view-table-btn" class="view-btn active" title="Table view">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="8" y1="6" x2="21" y2="6"></line>
                 <line x1="8" y1="12" x2="21" y2="12"></line>
@@ -181,22 +181,21 @@
         <button id="btn-reset-filters" class="btn btn-secondary">Reset Filters</button>
       </div>
 
-      <!-- Applications Grid Container -->
-      <div id="apps-grid" class="apps-grid"></div>
+      <!-- Applications Grid Container (hidden by default) -->
+      <div id="apps-grid" class="apps-grid" style="display: none;"></div>
 
-      <!-- Applications Table Container (hidden by default) -->
-      <div id="apps-table-container" class="table-container" style="display: none;">
+      <!-- Applications Table Container (default view) -->
+      <div id="apps-table-container" class="table-container">
         <table class="apps-table">
           <thead>
             <tr>
-              <th style="width: 48px;">Icon</th>
+              <th style="width: 44px;">Icon</th>
               <th>Application Name</th>
               <th>Install Type</th>
               <th>Package Name / ID</th>
-              <th>Version / Size</th>
-              <th>Menu Status</th>
               <th>Uninstall Command</th>
-              <th style="width: 80px;">Action</th>
+              <th>Menu Status</th>
+              <th style="width: 76px;">Action</th>
             </tr>
           </thead>
           <tbody id="apps-table-body"></tbody>
