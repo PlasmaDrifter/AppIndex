@@ -14,6 +14,9 @@ AppIndex is a lightweight, local web dashboard and system inspector that invento
 ### Card Grid View
 ![AppIndex Card Grid View](screenshots/appindex-cards-view.png)
 
+### Application Inspector Modal
+![AppIndex Application Inspector Modal](screenshots/appindex-inspection-modal.png)
+
 ---
 
 ## Supported Package Formats & Sources
@@ -138,8 +141,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/jmc/Source/AppIndex
-ExecStart=/usr/bin/python3 /home/jmc/Source/AppIndex/server.py --port 8765
+WorkingDirectory=%h/Source/AppIndex
+ExecStart=/usr/bin/python3 %h/Source/AppIndex/server.py --port 8765
 Restart=on-failure
 RestartSec=3
 
@@ -166,9 +169,10 @@ To launch AppIndex directly from your KDE, GNOME, or XFCE application menu:
 #!/bin/bash
 PORT=8765
 URL="http://127.0.0.1:${PORT}"
+APPINDEX_DIR="${APPINDEX_DIR:-$HOME/Source/AppIndex}"
 
 # Ensure service is active or start it
-systemctl --user start appindex.service 2>/dev/null || nohup python3 /home/jmc/Source/AppIndex/server.py --port $PORT >/dev/null 2>&1 &
+systemctl --user start appindex.service 2>/dev/null || nohup python3 "${APPINDEX_DIR}/server.py" --port $PORT >/dev/null 2>&1 &
 
 # Open in default web browser
 xdg-open "$URL"
@@ -183,10 +187,10 @@ Type=Application
 Name=AppIndex
 GenericName=Linux Application & Package Inventory
 Comment=Inspect installed applications, package managers, and uninstall commands
-Exec=/home/jmc/Scripts/appindex.sh launch
-Icon=/home/jmc/Source/AppIndex/static/icon.svg
+Exec=sh -c '"$HOME/Scripts/appindex.sh" launch'
+Icon=utilities-terminal
 Terminal=false
-Categories=System;Utility;
+Categories=LocalTools;
 Keywords=apps;packages;inventory;uninstall;flatpak;appimage;rpm;pacman;apt;steam;pwa;
 ```
 

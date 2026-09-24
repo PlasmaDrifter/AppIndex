@@ -167,6 +167,9 @@ def get_distribution_info(os_release_path: Optional[str] = None) -> Dict[str, An
                 pass
 
     all_ids = [info["id"]] + info["id_like"]
+    clean_name = re.sub(r"\b(?:GNU/)?Linux\b", "", info["name"], flags=re.IGNORECASE).strip()
+    clean_name = re.sub(r"\s+", " ", clean_name)
+    info["display_name"] = clean_name if clean_name else info["name"]
 
     # Detect package manager by prioritizing distribution family, then available database
     if any(x in ("fedora", "nobara", "rhel", "centos") for x in all_ids) or (HAS_RPM_LIB and (shutil.which("dnf") or shutil.which("rpm"))):
@@ -545,7 +548,11 @@ def scan_all_applications() -> Dict[str, Any]:
 
     file_to_pkg = query_system_package_database(query_files, distro_info)
 
-    distro_name = distro_info.get("name", "Linux")
+    distro_raw = distro_info.get("display_name") or distro_info.get("name", "System")
+    distro_name = re.sub(r"\b(?:GNU/)?Linux\b", "", distro_raw, flags=re.IGNORECASE).strip()
+    distro_name = re.sub(r"\s+", " ", distro_name)
+    if not distro_name:
+        distro_name = "System"
     pkg_label = distro_info.get("pkg_manager_label", "Repo")
     pkg_type = distro_info.get("pkg_manager_type", "rpm")
     uninstall_prefix = distro_info.get("uninstall_prefix", "sudo rm -f")

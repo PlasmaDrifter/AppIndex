@@ -48,10 +48,19 @@ class TestScanner(unittest.TestCase):
         self.assertGreater(len(desktops), 0)
 
     def test_parse_desktop_file(self):
-        parsed = parse_desktop_file("/usr/share/applications/smplayer.desktop")
-        self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["name"], "SMPlayer")
-        self.assertIn("smplayer", parsed["exec_cmd"])
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".desktop", delete=False) as f:
+            f.write("[Desktop Entry]\nType=Application\nName=SampleApp\nExec=sample-app %u\nCategories=Utility;\n")
+            temp_path = f.name
+        try:
+            parsed = parse_desktop_file(temp_path)
+            self.assertIsNotNone(parsed)
+            self.assertEqual(parsed["name"], "SampleApp")
+            self.assertIn("sample-app", parsed["exec_cmd"])
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
     def test_extract_executable(self):
         self.assertEqual(extract_executable("smplayer %U"), "smplayer")
@@ -72,7 +81,7 @@ class TestAPI(unittest.TestCase):
         self.assertIn("applications", data)
 
     def test_get_icon_endpoint(self):
-        response = self.client.get("/api/icon?name=smplayer")
+        response = self.client.get("/api/icon?name=system-search")
         self.assertEqual(response.status_code, 200)
         self.assertIn("image/", response.headers.get("content-type", ""))
 
