@@ -14,11 +14,11 @@ AppIndex is a lightweight, local web dashboard and system inspector that invento
 ### Card Grid View
 ![AppIndex Card Grid View](screenshots/appindex-cards-view.png)
 
-### Application Inspector Modal
-![AppIndex Application Inspector Modal](screenshots/appindex-inspection-modal.png)
+### Application Inspector
+![AppIndex Application Inspector](screenshots/appindex-inspection-modal.png)
 
-### Customizable Export Modal
-![AppIndex Export Inventory Modal](screenshots/appindex-export-modal.png)
+### Customizable Export
+![AppIndex Export Inventory](screenshots/appindex-export-modal.png)
 
 ---
 
