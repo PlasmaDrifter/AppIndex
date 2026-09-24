@@ -71,6 +71,11 @@ class TestAPI(unittest.TestCase):
         self.assertIn("text/csv", response.headers.get("content-type", ""))
         self.assertIn("package_name", response.text)
 
+    def test_favicon_endpoint(self):
+        response = self.client.get("/favicon.ico")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("image/", response.headers.get("content-type", ""))
+
 
 if __name__ == "__main__":
     unittest.main()

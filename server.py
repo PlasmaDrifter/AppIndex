@@ -16,7 +16,7 @@ import xdg.IconTheme
 
 from scanner import scan_all_applications
 
-app = FastAPI(title="AppIndex", version="0.1.0")
+app = FastAPI(title="AppIndex", version="0.1.1")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -82,6 +82,17 @@ async def serve_index():
     if os.path.isfile(index_file):
         return FileResponse(index_file)
     return HTMLResponse("<h1>AppIndex</h1><p>Frontend file missing.</p>")
+
+
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
+async def favicon():
+    favicon_ico = os.path.join(STATIC_DIR, "favicon.ico")
+    if os.path.isfile(favicon_ico):
+        return FileResponse(favicon_ico, media_type="image/x-icon")
+    favicon_svg = os.path.join(STATIC_DIR, "icon.svg")
+    if os.path.isfile(favicon_svg):
+        return FileResponse(favicon_svg, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="Favicon not found")
 
 
 @app.get("/api/apps")
