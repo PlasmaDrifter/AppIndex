@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Menu Inspector</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>App Menu Inspector</h1>
+          <span class="brand-subtitle">Linux Application &amp; Package Inventory</span>
+        </div>
+      </div>
+
+      <div class="nav-controls">
+        <button id="btn-refresh" class="btn btn-secondary" title="Re-scan applications">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span>Rescan System</span>
+        </button>
+
+        <div class="dropdown">
+          <button id="btn-export" class="btn btn-outline" title="Export inventory">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Export</span>
+          </button>
+          <div class="dropdown-menu" id="export-menu">
+            <a href="/api/export?format=csv" download="installed_apps.csv" class="dropdown-item">Export as CSV</a>
+            <a href="/api/export?format=json" download="installed_apps.json" class="dropdown-item">Export as JSON</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Metrics Dashboard -->
+    <section class="stats-container" id="stats-section">
+      <div class="stat-card stat-total" data-filter="all">
+        <span class="stat-label">Total Applications</span>
+        <span class="stat-value" id="stat-total">-</span>
+      </div>
+      <div class="stat-card stat-menu" data-filter="in_menu">
+        <span class="stat-label">In App Menu</span>
+        <span class="stat-value" id="stat-menu">-</span>
+      </div>
+      <div class="stat-card stat-rpm" data-filter="repo_rpm">
+        <span class="stat-label">Repo (RPM / DNF)</span>
+        <span class="stat-value" id="stat-rpm">-</span>
+      </div>
+      <div class="stat-card stat-flatpak" data-filter="flatpak">
+        <span class="stat-label">Flatpak</span>
+        <span class="stat-value" id="stat-flatpak">-</span>
+      </div>
+      <div class="stat-card stat-local" data-filter="local_tool">
+        <span class="stat-label">Local Tools / Scripts</span>
+        <span class="stat-value" id="stat-local">-</span>
+      </div>
+      <div class="stat-card stat-appimage" data-filter="appimage">
+        <span class="stat-label">AppImage / Portable</span>
+        <span class="stat-value" id="stat-appimage">-</span>
+      </div>
+    </section>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Toolbar: Search and Filter Tabs -->
+      <div class="toolbar">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="search-input" placeholder="Search by name, package, executable, description..." autocomplete="off">
+          <button id="clear-search" class="clear-btn" style="display: none;">&times;</button>
+        </div>
+
+        <div class="filter-controls">
+          <div class="select-wrapper">
+            <label for="category-filter">Category:</label>
+            <select id="category-filter">
+              <option value="all">All Categories</option>
+              <option value="Local Tools">Local Tools</option>
+              <option value="Audio & Video">Audio &amp; Video</option>
+              <option value="Development">Development</option>
+              <option value="Games">Games</option>
+              <option value="Graphics">Graphics</option>
+              <option value="Internet">Internet</option>
+              <option value="Office">Office</option>
+              <option value="Settings">Settings</option>
+              <option value="System">System</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="select-wrapper">
+            <label for="sort-by">Sort:</label>
+            <select id="sort-by">
+              <option value="name_asc">Name (A-Z)</option>
+              <option value="name_desc">Name (Z-A)</option>
+              <option value="source">Install Source</option>
+              <option value="pkg">Package Name</option>
+            </select>
+          </div>
+
+          <div class="view-toggle">
+            <button id="view-cards-btn" class="view-btn active" title="Card view">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+            <button id="view-table-btn" class="view-btn" title="Table view">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Tabs Bar -->
+      <div class="filter-tabs">
+        <button class="tab-btn active" data-source="all">All Apps (<span id="count-all">0</span>)</button>
+        <button class="tab-btn" data-source="in_menu">In App Menu (<span id="count-menu">0</span>)</button>
+        <button class="tab-btn tab-highlight" data-source="local_tool">Local Tools (<span id="count-local">0</span>)</button>
+        <button class="tab-btn" data-source="repo_rpm">Repo (RPM) (<span id="count-rpm">0</span>)</button>
+        <button class="tab-btn" data-source="flatpak">Flatpak (<span id="count-flatpak">0</span>)</button>
+        <button class="tab-btn" data-source="appimage">AppImage (<span id="count-appimage">0</span>)</button>
+        <button class="tab-btn" data-source="steam">Steam (<span id="count-steam">0</span>)</button>
+        <button class="tab-btn" data-source="unmanaged">Unmanaged (<span id="count-unmanaged">0</span>)</button>
+        <button class="tab-btn" data-source="hidden">Hidden / Helper (<span id="count-hidden">0</span>)</button>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading-spinner" class="loading-state">
+        <div class="spinner"></div>
+        <p>Scanning system application directories and packages...</p>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state" style="display: none;">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <h3>No matching applications found</h3>
+        <p>Try refining your search terms or clearing active filters.</p>
+        <button id="btn-reset-filters" class="btn btn-secondary">Reset Filters</button>
+      </div>
+
+      <!-- Applications Grid Container -->
+      <div id="apps-grid" class="apps-grid"></div>
+
+      <!-- Applications Table Container (hidden by default) -->
+      <div id="apps-table-container" class="table-container" style="display: none;">
+        <table class="apps-table">
+          <thead>
+            <tr>
+              <th style="width: 48px;">Icon</th>
+              <th>Application Name</th>
+              <th>Install Type</th>
+              <th>Package Name / ID</th>
+              <th>Version / Size</th>
+              <th>Menu Status</th>
+              <th>Uninstall Command</th>
+              <th style="width: 80px;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="apps-table-body"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <!-- Detail Inspection Modal -->
+    <div id="detail-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <img id="modal-app-icon" class="modal-icon" src="" alt="Icon">
+            <div>
+              <h2 id="modal-app-name">Application</h2>
+              <span id="modal-app-generic" class="modal-subtitle"></span>
+            </div>
+          </div>
+          <button id="modal-close-btn" class="modal-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="modal-info-grid">
+            <div class="info-row">
+              <span class="info-label">Installation Source:</span>
+              <span class="info-value" id="modal-source-label"></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Package Name:</span>
+              <div class="info-copy-value">
+                <code id="modal-package-name"></code>
+                <button class="copy-small-btn" data-target="modal-package-name" title="Copy package name">Copy</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Version / Architecture:</span>
+              <span class="info-value" id="modal-version-arch"></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Installed Size:</span>
+              <span class="info-value" id="modal-size"></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Menu Visibility:</span>
+              <span class="info-value" id="modal-menu-status"></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Primary Category:</span>
+              <span class="info-value" id="modal-category"></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Exec Command:</span>
+              <code class="info-code" id="modal-exec"></code>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Desktop File Path:</span>
+              <div class="info-copy-value">
+                <code id="modal-desktop-path"></code>
+                <button class="copy-small-btn" data-target="modal-desktop-path" title="Copy desktop file path">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-uninstall-section">
+            <label class="section-title">Uninstall Command:</label>
+            <div class="command-box">
+              <pre><code id="modal-uninstall-cmd"></code></pre>
+              <button id="modal-copy-cmd-btn" class="btn btn-primary btn-sm">Copy Command</button>
+            </div>
+            <p id="modal-uninstall-note" class="command-note"></p>
+          </div>
+
+          <!-- Raw Desktop File Preview Section -->
+          <div class="modal-raw-section" id="modal-raw-container">
+            <div class="raw-header">
+              <span class="section-title">Raw .desktop File</span>
+              <button id="btn-toggle-raw" class="btn-link">View File Contents</button>
+            </div>
+            <pre id="raw-desktop-content" class="raw-code" style="display: none;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast" style="display: none;"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
