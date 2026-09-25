@@ -9,6 +9,7 @@ let currentCategoryFilter = "all";
 let currentSort = "name_asc";
 let currentSearchTerm = "";
 let currentViewMode = "table"; // "cards" or "table"
+let appUpdateData = null;
 
 // DOM Elements
 const loadingSpinner = document.getElementById("loading-spinner");
@@ -1031,8 +1032,6 @@ function applyGitHubNav() {
     settingsNavBadge.style.display = userSettings.showGitHubBtn ? "none" : "flex";
   }
 }
-
-let appUpdateData = null;
 
 function checkAppUpdatesAsync(force = false) {
   if (!userSettings.checkForUpdates) {
