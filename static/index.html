@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon.png">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/styles.css?v=0.3.0">
+  <link rel="stylesheet" href="/static/styles.css?v=0.3.0.1">
 </head>
 <body>
   <div class="app-layout">
@@ -45,23 +45,15 @@
           </svg>
         </a>
 
-        <button id="btn-refresh" class="btn btn-secondary btn-sm" title="Re-scan applications">
+        <button id="btn-refresh" class="btn btn-secondary btn-sm" title="Scan applications">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="23 4 23 10 17 10"></polyline>
             <polyline points="1 20 1 14 7 14"></polyline>
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
           </svg>
-          <span>Rescan</span>
+          <span>Scan</span>
         </button>
 
-        <button id="btn-export" class="btn btn-outline btn-sm" title="Export applications">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          <span>Export</span>
-        </button>
         <button id="btn-settings" class="btn btn-outline btn-sm nav-settings-btn" title="Application Settings">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
@@ -158,16 +150,19 @@
       </div>
 
       <!-- Filter Tabs Bar -->
-      <div class="filter-tabs">
-        <button class="tab-btn active" data-source="all">All Apps (<span id="count-all">0</span>)</button>
-        <button class="tab-btn" data-source="in_menu">In App Menu (<span id="count-menu">0</span>)</button>
-        <button class="tab-btn" data-source="local_tool">Local Tools (<span id="count-local">0</span>)</button>
-        <button class="tab-btn" data-source="repo_system" id="tab-repo">Repo (<span id="repo-pkg-mgr">RPM</span>) (<span id="count-rpm">0</span>)</button>
-        <button class="tab-btn" data-source="flatpak">Flatpak (<span id="count-flatpak">0</span>)</button>
-        <button class="tab-btn" data-source="appimage">AppImage (<span id="count-appimage">0</span>)</button>
-        <button class="tab-btn" data-source="steam">Steam (<span id="count-steam">0</span>)</button>
-        <button class="tab-btn" data-source="unmanaged">Unmanaged (<span id="count-unmanaged">0</span>)</button>
-        <button class="tab-btn" data-source="hidden">Hidden / Helper (<span id="count-hidden">0</span>)</button>
+      <div class="filter-tabs-bar">
+        <div class="filter-tabs-scroll">
+          <button class="tab-btn active" data-source="all">All Apps (<span id="count-all">0</span>)</button>
+          <button class="tab-btn" data-source="in_menu">In App Menu (<span id="count-menu">0</span>)</button>
+          <button class="tab-btn" data-source="local_tool">Local Tools (<span id="count-local">0</span>)</button>
+          <button class="tab-btn" data-source="repo_system" id="tab-repo">Repo (<span id="repo-pkg-mgr">RPM</span>) (<span id="count-rpm">0</span>)</button>
+          <button class="tab-btn" data-source="flatpak">Flatpak (<span id="count-flatpak">0</span>)</button>
+          <button class="tab-btn" data-source="appimage">AppImage (<span id="count-appimage">0</span>)</button>
+          <button class="tab-btn" data-source="steam">Steam (<span id="count-steam">0</span>)</button>
+          <button class="tab-btn" data-source="unmanaged">Unmanaged (<span id="count-unmanaged">0</span>)</button>
+          <button class="tab-btn" data-source="hidden">Hidden / Helper (<span id="count-hidden">0</span>)</button>
+        </div>
+        <button id="btn-export" class="tab-btn tab-btn-export" title="Export applications">Export</button>
       </div>
 
       <!-- Loading State -->
@@ -762,6 +757,6 @@
     <div id="toast" class="toast" style="display: none;"></div>
   </div>
 
-  <script src="/static/app.js?v=0.3.0"></script>
+  <script src="/static/app.js?v=0.3.0.1"></script>
 </body>
 </html>

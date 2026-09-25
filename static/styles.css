@@ -154,6 +154,22 @@ body {
   gap: 8px;
 }
 
+.nav-controls .btn {
+  height: 27px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--radius-sm, 4px);
+  line-height: normal;
+  box-sizing: border-box;
+  gap: 6px;
+}
+
+.nav-controls .btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;
@@ -690,14 +706,26 @@ body {
   color: var(--accent-blue);
 }
 
-/* Filter Tabs Bar */
-.filter-tabs {
+/* Filter Tabs Bar & Export Button */
+.filter-tabs-bar {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
+  align-items: center;
+  gap: 12px;
   padding-bottom: 10px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--border-color);
+  width: 100%;
+}
+
+.filter-tabs-scroll,
+.filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  min-width: 0;
+  flex: 1;
+  scrollbar-width: thin;
 }
 
 .tab-btn {
@@ -728,6 +756,26 @@ body {
   color: var(--btn-primary-text, #181926);
   border-color: var(--accent-blue);
   font-weight: 600;
+}
+
+/* Export Button: Same aesthetics as other tab-btns, subtle yellow tint, anchored right */
+.tab-btn.tab-btn-export {
+  margin-left: auto;
+  flex-shrink: 0;
+  background-color: rgba(238, 212, 159, 0.08);
+  border: 1px solid rgba(238, 212, 159, 0.35);
+  color: var(--accent-yellow, #eed49f);
+}
+
+.tab-btn.tab-btn-export:hover {
+  background-color: rgba(238, 212, 159, 0.18);
+  border-color: rgba(238, 212, 159, 0.65);
+  color: var(--accent-yellow, #eed49f);
+  box-shadow: 0 0 10px rgba(238, 212, 159, 0.25);
+}
+
+.tab-btn.tab-btn-export:active {
+  transform: translateY(1px);
 }
 
 /* Loading & Empty States */

@@ -337,9 +337,9 @@ function setupEventListeners() {
   });
 
   // Filter tabs
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
+  document.querySelectorAll(".tab-btn[data-source]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-btn[data-source]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       currentSourceFilter = btn.dataset.source;
       renderApplications();
@@ -360,7 +360,7 @@ function setupEventListeners() {
   // Refresh button
   btnRefresh.addEventListener("click", async () => {
     btnRefresh.classList.add("loading");
-    showToast("Rescanning system packages...");
+    showToast("Scanning system packages...");
     try {
       const res = await fetch("/api/refresh", { method: "POST" });
       const data = await res.json();
@@ -370,7 +370,7 @@ function setupEventListeners() {
       renderApplications();
       showToast("Scan complete: " + allApps.length + " applications found");
     } catch (err) {
-      showToast("Failed to rescan applications");
+      showToast("Failed to scan applications");
     } finally {
       btnRefresh.classList.remove("loading");
     }
