@@ -31,7 +31,7 @@ AppIndex automatically scans and classifies applications from across all major L
 - Cross-references exports with `flatpak list` to extract application IDs, branch versions (e.g. `stable`), and installed disk footprints.
 - Generates exact removal commands: `flatpak uninstall <app_id>` or `flatpak uninstall --user <app_id>`.
 
-### 2. AppImages & Portable Executables
+### 2. AppImages
 - Detects standalone AppImage binaries located in standard directories like `~/Applications` or invoked from custom desktop files.
 - Automatically discovers unindexed executable binaries placed in `~/Applications` and creates inventory records.
 - Provides direct removal commands that clean up both the portable binary and any associated menu entries.

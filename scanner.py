@@ -639,7 +639,7 @@ def scan_all_applications() -> Dict[str, Any]:
             or (primary_exe and os.path.exists(primary_exe) and "/Applications/" in primary_exe)
         ):
             source_type = "appimage"
-            source_label = "AppImage / Portable"
+            source_label = "AppImage"
             clean_exe = primary_exe.strip("\"'")
             if os.path.exists(clean_exe):
                 processed_appimage_paths.add(os.path.realpath(clean_exe))
@@ -765,7 +765,7 @@ def scan_all_applications() -> Dict[str, Any]:
                             "desktop_filename": "",
                             "exec_command": app_path,
                             "source_type": "appimage",
-                            "source_label": "AppImage / Portable (Standalone)",
+                            "source_label": "AppImage (Standalone)",
                             "package_name": item,
                             "package_version": "",
                             "package_arch": "",

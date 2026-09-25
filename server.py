@@ -22,7 +22,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-app = FastAPI(title="AppIndex", version="0.2.2")
+app = FastAPI(title="AppIndex", version="0.2.3")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
