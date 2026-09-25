@@ -1565,30 +1565,45 @@ function bindSettingsInteractiveEvents() {
     });
   }
 
-  if (helpBtn && helpPopover) {
-    helpBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const isVisible = helpPopover.style.display === "block";
-      helpPopover.style.display = isVisible ? "none" : "block";
-      helpBtn.classList.toggle("active", !isVisible);
-    });
+  const setupPopover = (btnId, popoverId) => {
+    const btn = document.getElementById(btnId);
+    const popover = document.getElementById(popoverId);
+    if (!btn || !popover) return;
 
-    document.addEventListener("click", (e) => {
-      if (helpPopover && !helpPopover.contains(e.target) && e.target !== helpBtn) {
-        helpPopover.style.display = "none";
-        helpBtn.classList.remove("active");
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isVisible = popover.style.display === "block";
+
+      document.querySelectorAll(".help-popover").forEach((p) => (p.style.display = "none"));
+      document.querySelectorAll(".help-circle-btn").forEach((b) => b.classList.remove("active"));
+
+      popover.style.display = isVisible ? "none" : "block";
+      btn.classList.toggle("active", !isVisible);
+    });
+  };
+
+  setupPopover("services-help-btn", "services-help-popover");
+  setupPopover("github-help-btn", "github-help-popover");
+
+  document.addEventListener("click", (e) => {
+    document.querySelectorAll(".help-popover").forEach((popover) => {
+      if (!popover.contains(e.target)) {
+        popover.style.display = "none";
       }
     });
-  }
+    document.querySelectorAll(".help-circle-btn").forEach((btn) => {
+      if (!btn.contains(e.target)) {
+        btn.classList.remove("active");
+      }
+    });
+  });
 }
 
 function openSettingsModal() {
   const modal = document.getElementById("settings-modal");
   if (modal) {
-    const helpPopover = document.getElementById("services-help-popover");
-    const helpBtn = document.getElementById("services-help-btn");
-    if (helpPopover) helpPopover.style.display = "none";
-    if (helpBtn) helpBtn.classList.remove("active");
+    document.querySelectorAll(".help-popover").forEach((p) => (p.style.display = "none"));
+    document.querySelectorAll(".help-circle-btn").forEach((b) => b.classList.remove("active"));
 
     syncSettingsUI();
     modal.style.display = "flex";
@@ -1598,10 +1613,8 @@ function openSettingsModal() {
 function closeSettingsModal() {
   const modal = document.getElementById("settings-modal");
   if (modal) {
-    const helpPopover = document.getElementById("services-help-popover");
-    const helpBtn = document.getElementById("services-help-btn");
-    if (helpPopover) helpPopover.style.display = "none";
-    if (helpBtn) helpBtn.classList.remove("active");
+    document.querySelectorAll(".help-popover").forEach((p) => (p.style.display = "none"));
+    document.querySelectorAll(".help-circle-btn").forEach((b) => b.classList.remove("active"));
 
     modal.style.display = "none";
   }
