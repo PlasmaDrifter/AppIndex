@@ -229,7 +229,9 @@ let userSettings = {
   savedCustomThemes: {},
   showServicesLink: false,
   openServicesInSameTab: false,
-  servicesDashboardUrl: "http://localhost:5100"
+  servicesDashboardUrl: "http://localhost:5100",
+  showGitHubBtn: true,
+  checkForUpdates: true
 };
 
 // Settings Modal Elements
@@ -269,6 +271,13 @@ document.addEventListener("DOMContentLoaded", () => {
     loadApplications();
   } catch (err) {
     console.error("Error loading applications:", err);
+  }
+  try {
+    if (userSettings.checkForUpdates) {
+      checkAppUpdatesAsync();
+    }
+  } catch (err) {
+    console.error("Error checking for updates:", err);
   }
 });
 
@@ -969,7 +978,9 @@ function loadSavedSettings() {
         savedCustomThemes: parsed.savedCustomThemes || {},
         showServicesLink: Boolean(parsed.showServicesLink),
         openServicesInSameTab: Boolean(parsed.openServicesInSameTab),
-        servicesDashboardUrl: parsed.servicesDashboardUrl || "http://localhost:5100"
+        servicesDashboardUrl: parsed.servicesDashboardUrl || "http://localhost:5100",
+        showGitHubBtn: parsed.showGitHubBtn !== undefined ? Boolean(parsed.showGitHubBtn) : true,
+        checkForUpdates: parsed.checkForUpdates !== undefined ? Boolean(parsed.checkForUpdates) : true
       };
     }
   } catch (err) {
@@ -1005,6 +1016,83 @@ function applyAllActiveSettings() {
 
   // Apply Services Nav Link
   applyServicesNav();
+
+  // Apply GitHub Nav Button
+  applyGitHubNav();
+}
+
+function applyGitHubNav() {
+  const link = document.getElementById("nav-github-link");
+  if (!link) return;
+  link.style.display = userSettings.showGitHubBtn ? "inline-flex" : "none";
+}
+
+let appUpdateData = null;
+
+function checkAppUpdatesAsync(force = false) {
+  if (!userSettings.checkForUpdates) {
+    clearUpdateIndicator();
+    return;
+  }
+
+  const url = force ? "/api/check-update?force=1" : "/api/check-update";
+  fetch(url)
+    .then((r) => r.json())
+    .then((data) => {
+      appUpdateData = data;
+      renderUpdateUI(data);
+    })
+    .catch((err) => {
+      console.warn("Could not check for updates:", err);
+    });
+}
+
+function renderUpdateUI(data) {
+  const ghLink = document.getElementById("nav-github-link");
+  const navBadge = document.getElementById("nav-update-badge");
+  const statusBadge = document.getElementById("update-status-badge");
+
+  if (!userSettings.checkForUpdates) {
+    clearUpdateIndicator();
+    return;
+  }
+
+  if (data && data.has_update) {
+    if (ghLink) {
+      ghLink.classList.add("has-update");
+      if (data.release_url) ghLink.href = data.release_url;
+      ghLink.title = `Update available (${data.latest_version}) - Click to view release`;
+    }
+    if (navBadge) {
+      navBadge.style.display = "flex";
+      navBadge.title = `Update available: ${data.latest_version}`;
+    }
+    if (statusBadge) {
+      statusBadge.style.display = "inline-block";
+      const cleanVer = data.latest_version.startsWith("v") ? data.latest_version : `v${data.latest_version}`;
+      statusBadge.textContent = `${cleanVer} available`;
+    }
+  } else {
+    clearUpdateIndicator();
+  }
+}
+
+function clearUpdateIndicator() {
+  const ghLink = document.getElementById("nav-github-link");
+  const navBadge = document.getElementById("nav-update-badge");
+  const statusBadge = document.getElementById("update-status-badge");
+
+  if (ghLink) {
+    ghLink.classList.remove("has-update");
+    ghLink.href = "https://github.com/PlasmaDrifter/AppIndex";
+    ghLink.title = "GitHub Repository";
+  }
+  if (navBadge) {
+    navBadge.style.display = "none";
+  }
+  if (statusBadge) {
+    statusBadge.style.display = "none";
+  }
 }
 
 function applyServicesNav() {
@@ -1099,6 +1187,25 @@ function syncSettingsUI() {
   const sameTabWrapper = document.getElementById("companion-same-tab-wrapper");
   const servicesUrlConfig = document.getElementById("services-url-config");
   const servicesUrlInput = document.getElementById("services-url-input");
+  const toggleGitHub = document.getElementById("toggle-github-btn");
+  const toggleUpdates = document.getElementById("toggle-check-updates");
+
+  if (toggleGitHub) {
+    toggleGitHub.checked = Boolean(userSettings.showGitHubBtn);
+  }
+  if (toggleUpdates) {
+    toggleUpdates.checked = Boolean(userSettings.checkForUpdates);
+  }
+  const statusBadge = document.getElementById("update-status-badge");
+  if (statusBadge) {
+    if (userSettings.checkForUpdates && appUpdateData && appUpdateData.has_update) {
+      statusBadge.style.display = "inline-block";
+      const cleanVer = appUpdateData.latest_version.startsWith("v") ? appUpdateData.latest_version : `v${appUpdateData.latest_version}`;
+      statusBadge.textContent = `${cleanVer} available`;
+    } else {
+      statusBadge.style.display = "none";
+    }
+  }
   if (toggleServices) {
     toggleServices.checked = Boolean(userSettings.showServicesLink);
   }
@@ -1349,6 +1456,8 @@ function bindSettingsInteractiveEvents() {
       userSettings.density = "standard";
       userSettings.fontScale = 100;
       userSettings.customColors = null;
+      userSettings.showGitHubBtn = true;
+      userSettings.checkForUpdates = true;
       userSettings.showServicesLink = false;
       userSettings.openServicesInSameTab = false;
       userSettings.servicesDashboardUrl = "http://localhost:5100";
@@ -1356,7 +1465,34 @@ function bindSettingsInteractiveEvents() {
       applyAllActiveSettings();
       syncSettingsUI();
       saveSettingsToStorage();
+      if (userSettings.checkForUpdates) {
+        checkAppUpdatesAsync();
+      }
       showToast("Reset all settings to default");
+    });
+  }
+
+  // Navigation Links & Updates
+  const toggleGitHub = document.getElementById("toggle-github-btn");
+  const toggleUpdates = document.getElementById("toggle-check-updates");
+
+  if (toggleGitHub) {
+    toggleGitHub.addEventListener("change", (e) => {
+      userSettings.showGitHubBtn = e.target.checked;
+      applyGitHubNav();
+      saveSettingsToStorage();
+    });
+  }
+
+  if (toggleUpdates) {
+    toggleUpdates.addEventListener("change", (e) => {
+      userSettings.checkForUpdates = e.target.checked;
+      saveSettingsToStorage();
+      if (e.target.checked) {
+        checkAppUpdatesAsync();
+      } else {
+        clearUpdateIndicator();
+      }
     });
   }
 

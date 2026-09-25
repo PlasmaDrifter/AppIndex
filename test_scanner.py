@@ -126,6 +126,29 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("image/", response.headers.get("content-type", ""))
 
+    def test_check_update_endpoint(self):
+        response = self.client.get("/api/check-update")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("has_update", data)
+        self.assertIn("latest_version", data)
+        self.assertIn("release_url", data)
+        self.assertIn("current_version", data)
+        self.assertIn("check_enabled", data)
+
+
+class TestVersionComparison(unittest.TestCase):
+    def test_version_parsing(self):
+        from server import parse_version_tuple, is_newer_version
+        self.assertEqual(parse_version_tuple("0.2.4"), (0, 2, 4))
+        self.assertEqual(parse_version_tuple("v0.2.5"), (0, 2, 5))
+        self.assertEqual(parse_version_tuple("v1.0.0-rc1"), (1, 0, 0))
+
+        self.assertTrue(is_newer_version("0.2.5", "0.2.4"))
+        self.assertTrue(is_newer_version("v1.0.0", "0.9.9"))
+        self.assertFalse(is_newer_version("0.2.4", "0.2.4"))
+        self.assertFalse(is_newer_version("0.2.3", "0.2.4"))
+
 
 if __name__ == "__main__":
     unittest.main()

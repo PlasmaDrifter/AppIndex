@@ -9,9 +9,12 @@ import json
 import mimetypes
 import os
 import re
+import threading
+import time
 from typing import Optional
+import urllib.request
 from fastapi import FastAPI, Query, HTTPException, Response
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import xdg.IconTheme
@@ -22,13 +25,109 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-app = FastAPI(title="AppIndex", version="0.2.4")
+APP_VERSION = "0.2.5"
+GITHUB_REPO = "PlasmaDrifter/AppIndex"
+
+app = FastAPI(title="AppIndex", version=APP_VERSION)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 # In-memory cache
 _CACHED_DATA = None
+
+
+def parse_version_tuple(ver_str: str):
+    clean = re.sub(r"^[^\d]*", "", str(ver_str).strip())
+    parts = []
+    for part in clean.split("."):
+        digits = re.match(r"^\d+", part)
+        if digits:
+            parts.append(int(digits.group(0)))
+        else:
+            break
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def is_newer_version(latest: str, current: str) -> bool:
+    try:
+        return parse_version_tuple(latest) > parse_version_tuple(current)
+    except Exception:
+        return False
+
+
+UPDATE_CACHE = {
+    "last_checked": 0,
+    "latest_version": "",
+    "release_url": "",
+    "has_update": False,
+    "lock": threading.Lock(),
+}
+
+
+def check_github_update(force: bool = False, enabled: bool = True):
+    if not enabled:
+        return {
+            "has_update": False,
+            "latest_version": APP_VERSION,
+            "release_url": f"https://github.com/{GITHUB_REPO}/releases",
+            "current_version": APP_VERSION,
+            "check_enabled": False,
+        }
+
+    now = time.time()
+    # Cache for 1 hour (3600 seconds) unless forced
+    with UPDATE_CACHE["lock"]:
+        if not force and (now - UPDATE_CACHE["last_checked"] < 3600) and UPDATE_CACHE["last_checked"] > 0:
+            return {
+                "has_update": UPDATE_CACHE["has_update"],
+                "latest_version": UPDATE_CACHE["latest_version"],
+                "release_url": UPDATE_CACHE["release_url"],
+                "current_version": APP_VERSION,
+                "check_enabled": True,
+            }
+
+    try:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": f"AppIndex-UpdateChecker/{APP_VERSION}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            tag = data.get("tag_name", "").strip()
+            html_url = data.get("html_url") or f"https://github.com/{GITHUB_REPO}/releases"
+            has_update = bool(tag and is_newer_version(tag, APP_VERSION))
+
+            with UPDATE_CACHE["lock"]:
+                UPDATE_CACHE["last_checked"] = now
+                UPDATE_CACHE["latest_version"] = tag or APP_VERSION
+                UPDATE_CACHE["release_url"] = html_url
+                UPDATE_CACHE["has_update"] = has_update
+
+            return {
+                "has_update": has_update,
+                "latest_version": tag or APP_VERSION,
+                "release_url": html_url,
+                "current_version": APP_VERSION,
+                "check_enabled": True,
+            }
+    except Exception:
+        with UPDATE_CACHE["lock"]:
+            # On error, wait 10 min before next attempt to avoid spamming
+            UPDATE_CACHE["last_checked"] = now - 3000
+            return {
+                "has_update": UPDATE_CACHE["has_update"],
+                "latest_version": UPDATE_CACHE["latest_version"] or APP_VERSION,
+                "release_url": UPDATE_CACHE["release_url"] or f"https://github.com/{GITHUB_REPO}/releases",
+                "current_version": APP_VERSION,
+                "check_enabled": True,
+            }
 
 
 def get_cached_or_scan(force_refresh: bool = False):
@@ -349,6 +448,12 @@ async def export_apps(
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=installed_apps.json"},
     )
+
+
+@app.get("/api/check-update")
+def check_update_api(force: int = 0):
+    """Check for application updates on GitHub."""
+    return check_github_update(force=bool(force))
 
 
 # Mount static assets
