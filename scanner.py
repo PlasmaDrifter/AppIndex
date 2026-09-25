@@ -575,7 +575,7 @@ def scan_all_applications() -> Dict[str, Any]:
         primary_exe = extract_executable(exec_cmd) or ""
 
         source_type = "unmanaged"
-        source_label = "Unmanaged System Entry"
+        source_label = "Unmanaged"
         package_name = fname.replace(".desktop", "")
         package_version = ""
         package_arch = ""
@@ -699,7 +699,7 @@ def scan_all_applications() -> Dict[str, Any]:
 
         else:
             source_type = "unmanaged"
-            source_label = "Unmanaged / Manual Build"
+            source_label = "Unmanaged"
             package_name = fname.replace(".desktop", "")
             uninstall_command = f'sudo rm -f "{path}"'
             uninstall_note = "Manually created system desktop entry"

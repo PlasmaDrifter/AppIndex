@@ -55,7 +55,7 @@ AppIndex automatically detects your host distribution via `/etc/os-release` and 
 - Indexes custom scripts and internal utilities registered in `~/.local/share/applications/`.
 - Accurately identifies user overrides that customize system or Flatpak applications, linking them back to the underlying package while noting the local customization.
 
-### 7. Unmanaged & Manual Builds
+### 7. Unmanaged
 - Catches compiled software (`make install`), manual extractions in `/opt` or `/usr/local`, and standalone binaries not registered with any system package manager.
 
 ---
