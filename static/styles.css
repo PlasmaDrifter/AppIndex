@@ -378,27 +378,24 @@ body {
   color: var(--accent-purple, #c6a0f6);
 }
 
-.update-banner-dismiss {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 18px;
-  line-height: 1;
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
+.update-banner-clear-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(245, 169, 127, 0.4);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm, 4px);
   cursor: pointer;
-  padding: 0;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  line-height: 1.2;
 }
 
-.update-banner-dismiss:hover {
-  color: var(--text-primary);
-  background-color: rgba(255, 255, 255, 0.1);
+.update-banner-clear-btn:hover {
+  background: rgba(245, 169, 127, 0.2);
+  border-color: var(--accent-orange, #f5a97f);
+  color: var(--accent-orange, #f5a97f);
 }
 
 .btn-sm {

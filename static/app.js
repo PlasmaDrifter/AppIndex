@@ -1024,12 +1024,8 @@ function applyAllActiveSettings() {
 
 function applyGitHubNav() {
   const link = document.getElementById("nav-github-link");
-  const settingsNavBadge = document.getElementById("settings-nav-badge");
   if (link) {
     link.style.display = userSettings.showGitHubBtn ? "inline-flex" : "none";
-  }
-  if (settingsNavBadge && appUpdateData && appUpdateData.has_update && userSettings.checkForUpdates) {
-    settingsNavBadge.style.display = userSettings.showGitHubBtn ? "none" : "flex";
   }
 }
 
@@ -1052,9 +1048,11 @@ function checkAppUpdatesAsync(force = false) {
 }
 
 function renderUpdateUI(data) {
+  if (data) {
+    appUpdateData = data;
+  }
   const ghLink = document.getElementById("nav-github-link");
   const navBadge = document.getElementById("nav-update-badge");
-  const settingsNavBadge = document.getElementById("settings-nav-badge");
   const statusBadge = document.getElementById("update-status-badge");
   const banner = document.getElementById("settings-update-banner");
   const bannerVer = document.getElementById("update-banner-version");
@@ -1067,27 +1065,32 @@ function renderUpdateUI(data) {
 
   if (data && data.has_update) {
     const cleanVer = data.latest_version.startsWith("v") ? data.latest_version : `v${data.latest_version}`;
+    const dismissedVer = localStorage.getItem("appindex_dismissed_update_version");
+    const isDismissed = Boolean(
+      dismissedVer && (dismissedVer === data.latest_version || dismissedVer === cleanVer || `v${dismissedVer}` === cleanVer)
+    );
 
     if (ghLink) {
-      ghLink.classList.add("has-update");
-      if (data.release_url) ghLink.href = data.release_url;
-      ghLink.title = `Update available (${data.latest_version}) - Click to view release`;
+      if (!isDismissed) {
+        ghLink.classList.add("has-update");
+        if (data.release_url) ghLink.href = data.release_url;
+        ghLink.title = `Update available (${data.latest_version}) - Click to view release`;
+      } else {
+        ghLink.classList.remove("has-update");
+        ghLink.href = "https://github.com/PlasmaDrifter/AppIndex";
+        ghLink.title = "GitHub Repository";
+      }
     }
     if (navBadge) {
-      navBadge.style.display = "flex";
+      navBadge.style.display = isDismissed ? "none" : "flex";
       navBadge.title = `Update available: ${data.latest_version}`;
-    }
-    if (settingsNavBadge) {
-      settingsNavBadge.style.display = userSettings.showGitHubBtn ? "none" : "flex";
-      settingsNavBadge.title = `Update available: ${data.latest_version}`;
     }
     if (statusBadge) {
       statusBadge.style.display = "inline-block";
       statusBadge.textContent = `${cleanVer} available`;
     }
     if (banner) {
-      const dismissedVer = localStorage.getItem("appindex_dismissed_update_version");
-      if (dismissedVer !== data.latest_version) {
+      if (!isDismissed) {
         banner.style.display = "flex";
         if (bannerVer) bannerVer.textContent = cleanVer;
         if (bannerLink && data.release_url) bannerLink.href = data.release_url;
@@ -1103,7 +1106,6 @@ function renderUpdateUI(data) {
 function clearUpdateIndicator() {
   const ghLink = document.getElementById("nav-github-link");
   const navBadge = document.getElementById("nav-update-badge");
-  const settingsNavBadge = document.getElementById("settings-nav-badge");
   const statusBadge = document.getElementById("update-status-badge");
   const banner = document.getElementById("settings-update-banner");
 
@@ -1114,9 +1116,6 @@ function clearUpdateIndicator() {
   }
   if (navBadge) {
     navBadge.style.display = "none";
-  }
-  if (settingsNavBadge) {
-    settingsNavBadge.style.display = "none";
   }
   if (statusBadge) {
     statusBadge.style.display = "none";
@@ -1243,10 +1242,13 @@ function syncSettingsUI() {
   const bannerLink = document.getElementById("update-banner-link");
   if (banner) {
     if (userSettings.checkForUpdates && appUpdateData && appUpdateData.has_update) {
+      const cleanVer = appUpdateData.latest_version.startsWith("v") ? appUpdateData.latest_version : `v${appUpdateData.latest_version}`;
       const dismissedVer = localStorage.getItem("appindex_dismissed_update_version");
-      if (dismissedVer !== appUpdateData.latest_version) {
+      const isDismissed = Boolean(
+        dismissedVer && (dismissedVer === appUpdateData.latest_version || dismissedVer === cleanVer || `v${dismissedVer}` === cleanVer)
+      );
+      if (!isDismissed) {
         banner.style.display = "flex";
-        const cleanVer = appUpdateData.latest_version.startsWith("v") ? appUpdateData.latest_version : `v${appUpdateData.latest_version}`;
         if (bannerVer) bannerVer.textContent = cleanVer;
         if (bannerLink && appUpdateData.release_url) bannerLink.href = appUpdateData.release_url;
       } else {
@@ -1529,15 +1531,27 @@ function bindSettingsInteractiveEvents() {
     });
   }
 
-  // Settings Update Banner Dismiss
+  // Settings Update Banner Clear
   const btnDismissBanner = document.getElementById("btn-dismiss-update-banner");
   if (btnDismissBanner) {
     btnDismissBanner.addEventListener("click", () => {
       const banner = document.getElementById("settings-update-banner");
       if (banner) banner.style.display = "none";
+
+      const navBadge = document.getElementById("nav-update-badge");
+      if (navBadge) navBadge.style.display = "none";
+
+      const ghLink = document.getElementById("nav-github-link");
+      if (ghLink) {
+        ghLink.classList.remove("has-update");
+        ghLink.href = "https://github.com/PlasmaDrifter/AppIndex";
+        ghLink.title = "GitHub Repository";
+      }
+
       if (appUpdateData && appUpdateData.latest_version) {
         localStorage.setItem("appindex_dismissed_update_version", appUpdateData.latest_version);
       }
+      showToast("Update notification cleared");
     });
   }
 

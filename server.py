@@ -25,7 +25,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.2.9"
+APP_VERSION = "0.3.0"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
