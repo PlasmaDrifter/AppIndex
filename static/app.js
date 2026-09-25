@@ -368,7 +368,7 @@ function setupEventListeners() {
       appStats = data.stats || {};
       updateStatsUI();
       renderApplications();
-      showToast("Scan complete: " + allApps.length + " applications found");
+      showToast("Rescan complete: " + allApps.length + " applications found");
     } catch (err) {
       showToast("Failed to rescan applications");
     } finally {
