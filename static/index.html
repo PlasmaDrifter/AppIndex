@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon.png">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/styles.css?v=0.2.0">
+  <link rel="stylesheet" href="/static/styles.css?v=0.2.1">
 </head>
 <body>
   <div class="app-layout">
@@ -30,6 +30,21 @@
       </div>
 
       <div class="nav-controls">
+        <a id="nav-services-link" href="http://localhost:5100" target="_blank" rel="noopener noreferrer" class="btn btn-services btn-sm" title="Open Podman &amp; Systemd Services Dashboard" style="display: none;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+          <span>Services</span>
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" class="nav-external-arrow">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </a>
+
         <button id="btn-refresh" class="btn btn-secondary btn-sm" title="Re-scan applications">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="23 4 23 10 17 10"></polyline>
@@ -407,6 +422,56 @@
               <div class="saved-themes-list" id="saved-themes-list"></div>
             </div>
           </div>
+
+          <!-- Section 5: Companion Tools -->
+          <div class="settings-section">
+            <div class="section-title-row">
+              <div class="companion-title-group">
+                <h3 class="settings-section-title">Companion Tools</h3>
+                <span class="settings-section-desc">Quick shortcuts to companion system management web apps</span>
+              </div>
+              <div class="help-popover-container">
+                <button type="button" id="services-help-btn" class="help-circle-btn" aria-label="About Services Dashboard" title="About Services Dashboard">?</button>
+                <div id="services-help-popover" class="help-popover" style="display: none;">
+                  <div class="help-popover-header">
+                    <strong>Podman &amp; Systemd Dashboard</strong>
+                  </div>
+                  <p class="help-popover-text">
+                    A web utility for inspecting and managing rootless Podman Quadlet containers, user systemd units, and scheduled timers.
+                  </p>
+                  <div class="help-popover-meta">
+                    <span class="help-popover-label">Default:</span>
+                    <code>http://localhost:5100</code>
+                  </div>
+                  <div class="help-popover-footer">
+                    <a href="https://github.com/PlasmaDrifter/podman-systemd-dashboard" target="_blank" rel="noopener noreferrer" class="help-popover-link">
+                      View on GitHub &rarr;
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="companion-toggle-row">
+              <label class="toggle-label" for="toggle-services-link">
+                <input type="checkbox" id="toggle-services-link">
+                <span class="toggle-slider"></span>
+                <span class="toggle-text">Show Services Dashboard in top navigation</span>
+              </label>
+
+              <label class="toggle-label" id="companion-same-tab-wrapper" for="toggle-services-same-tab" style="display: none;">
+                <input type="checkbox" id="toggle-services-same-tab">
+                <span class="toggle-slider"></span>
+                <span class="toggle-text">Open in same tab</span>
+              </label>
+            </div>
+
+            <div id="services-url-config" class="services-url-row" style="display: none;">
+              <label for="services-url-input" class="services-url-label">URL:</label>
+              <input type="url" id="services-url-input" class="input-text services-url-input" placeholder="http://localhost:5100" value="http://localhost:5100">
+              <button type="button" id="btn-reset-services-url" class="btn btn-outline btn-xs" title="Reset to default URL">Reset</button>
+            </div>
+          </div>
         </div>
 
         <div class="modal-footer">
@@ -614,6 +679,6 @@
     <div id="toast" class="toast" style="display: none;"></div>
   </div>
 
-  <script src="/static/app.js?v=0.2.0"></script>
+  <script src="/static/app.js?v=0.2.1"></script>
 </body>
 </html>

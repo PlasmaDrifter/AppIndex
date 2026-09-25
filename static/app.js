@@ -226,7 +226,10 @@ let userSettings = {
   density: "standard",
   fontScale: 100,
   customColors: null,
-  savedCustomThemes: {}
+  savedCustomThemes: {},
+  showServicesLink: false,
+  openServicesInSameTab: false,
+  servicesDashboardUrl: "http://localhost:5100"
 };
 
 // Settings Modal Elements
@@ -963,7 +966,10 @@ function loadSavedSettings() {
         density: parsed.density || "standard",
         fontScale: typeof parsed.fontScale === "number" ? parsed.fontScale : 100,
         customColors: parsed.customColors || null,
-        savedCustomThemes: parsed.savedCustomThemes || {}
+        savedCustomThemes: parsed.savedCustomThemes || {},
+        showServicesLink: Boolean(parsed.showServicesLink),
+        openServicesInSameTab: Boolean(parsed.openServicesInSameTab),
+        servicesDashboardUrl: parsed.servicesDashboardUrl || "http://localhost:5100"
       };
     }
   } catch (err) {
@@ -996,6 +1002,28 @@ function applyAllActiveSettings() {
 
   // Apply Font Scale
   applyFontScale(userSettings.fontScale);
+
+  // Apply Services Nav Link
+  applyServicesNav();
+}
+
+function applyServicesNav() {
+  const link = document.getElementById("nav-services-link");
+  if (!link) return;
+  const show = Boolean(userSettings.showServicesLink);
+  link.style.display = show ? "inline-flex" : "none";
+  link.href = userSettings.servicesDashboardUrl || "http://localhost:5100";
+
+  const arrow = link.querySelector(".nav-external-arrow");
+  if (userSettings.openServicesInSameTab) {
+    link.target = "_self";
+    link.removeAttribute("rel");
+    if (arrow) arrow.style.display = "none";
+  } else {
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    if (arrow) arrow.style.display = "";
+  }
 }
 
 function applyThemeColors(colorsObj) {
@@ -1063,6 +1091,28 @@ function syncSettingsUI() {
     presetsGrid.querySelectorAll(".theme-preset-card").forEach((card) => {
       card.classList.toggle("active", card.dataset.themeId === userSettings.themeId);
     });
+  }
+
+  // Sync Companion Tools (Services Dashboard)
+  const toggleServices = document.getElementById("toggle-services-link");
+  const toggleSameTab = document.getElementById("toggle-services-same-tab");
+  const sameTabWrapper = document.getElementById("companion-same-tab-wrapper");
+  const servicesUrlConfig = document.getElementById("services-url-config");
+  const servicesUrlInput = document.getElementById("services-url-input");
+  if (toggleServices) {
+    toggleServices.checked = Boolean(userSettings.showServicesLink);
+  }
+  if (toggleSameTab) {
+    toggleSameTab.checked = Boolean(userSettings.openServicesInSameTab);
+  }
+  if (sameTabWrapper) {
+    sameTabWrapper.style.display = userSettings.showServicesLink ? "inline-flex" : "none";
+  }
+  if (servicesUrlConfig) {
+    servicesUrlConfig.style.display = userSettings.showServicesLink ? "flex" : "none";
+  }
+  if (servicesUrlInput) {
+    servicesUrlInput.value = userSettings.servicesDashboardUrl || "http://localhost:5100";
   }
 }
 
@@ -1299,6 +1349,9 @@ function bindSettingsInteractiveEvents() {
       userSettings.density = "standard";
       userSettings.fontScale = 100;
       userSettings.customColors = null;
+      userSettings.showServicesLink = false;
+      userSettings.openServicesInSameTab = false;
+      userSettings.servicesDashboardUrl = "http://localhost:5100";
 
       applyAllActiveSettings();
       syncSettingsUI();
@@ -1306,11 +1359,89 @@ function bindSettingsInteractiveEvents() {
       showToast("Reset all settings to default");
     });
   }
+
+  // Companion Tools (Services Dashboard)
+  const toggleServices = document.getElementById("toggle-services-link");
+  const toggleSameTab = document.getElementById("toggle-services-same-tab");
+  const sameTabWrapper = document.getElementById("companion-same-tab-wrapper");
+  const servicesUrlConfig = document.getElementById("services-url-config");
+  const servicesUrlInput = document.getElementById("services-url-input");
+  const btnResetUrl = document.getElementById("btn-reset-services-url");
+  const helpBtn = document.getElementById("services-help-btn");
+  const helpPopover = document.getElementById("services-help-popover");
+
+  if (toggleServices) {
+    toggleServices.addEventListener("change", (e) => {
+      userSettings.showServicesLink = e.target.checked;
+      if (servicesUrlConfig) {
+        servicesUrlConfig.style.display = e.target.checked ? "flex" : "none";
+      }
+      if (sameTabWrapper) {
+        sameTabWrapper.style.display = e.target.checked ? "inline-flex" : "none";
+      }
+      applyServicesNav();
+      saveSettingsToStorage();
+    });
+  }
+
+  if (toggleSameTab) {
+    toggleSameTab.addEventListener("change", (e) => {
+      userSettings.openServicesInSameTab = e.target.checked;
+      applyServicesNav();
+      saveSettingsToStorage();
+    });
+  }
+
+  if (servicesUrlInput) {
+    const handleUrlChange = () => {
+      let val = servicesUrlInput.value.trim();
+      if (!val) {
+        val = "http://localhost:5100";
+        servicesUrlInput.value = val;
+      }
+      userSettings.servicesDashboardUrl = val;
+      applyServicesNav();
+      saveSettingsToStorage();
+    };
+    servicesUrlInput.addEventListener("change", handleUrlChange);
+    servicesUrlInput.addEventListener("blur", handleUrlChange);
+  }
+
+  if (btnResetUrl && servicesUrlInput) {
+    btnResetUrl.addEventListener("click", () => {
+      servicesUrlInput.value = "http://localhost:5100";
+      userSettings.servicesDashboardUrl = "http://localhost:5100";
+      applyServicesNav();
+      saveSettingsToStorage();
+      showToast("Reset Services URL to default");
+    });
+  }
+
+  if (helpBtn && helpPopover) {
+    helpBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isVisible = helpPopover.style.display === "block";
+      helpPopover.style.display = isVisible ? "none" : "block";
+      helpBtn.classList.toggle("active", !isVisible);
+    });
+
+    document.addEventListener("click", (e) => {
+      if (helpPopover && !helpPopover.contains(e.target) && e.target !== helpBtn) {
+        helpPopover.style.display = "none";
+        helpBtn.classList.remove("active");
+      }
+    });
+  }
 }
 
 function openSettingsModal() {
   const modal = document.getElementById("settings-modal");
   if (modal) {
+    const helpPopover = document.getElementById("services-help-popover");
+    const helpBtn = document.getElementById("services-help-btn");
+    if (helpPopover) helpPopover.style.display = "none";
+    if (helpBtn) helpBtn.classList.remove("active");
+
     syncSettingsUI();
     modal.style.display = "flex";
   }
@@ -1319,6 +1450,11 @@ function openSettingsModal() {
 function closeSettingsModal() {
   const modal = document.getElementById("settings-modal");
   if (modal) {
+    const helpPopover = document.getElementById("services-help-popover");
+    const helpBtn = document.getElementById("services-help-btn");
+    if (helpPopover) helpPopover.style.display = "none";
+    if (helpBtn) helpBtn.classList.remove("active");
+
     modal.style.display = "none";
   }
 }
