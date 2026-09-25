@@ -681,6 +681,7 @@ body {
   gap: 3px;
   text-transform: uppercase;
   letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 
 .badge-source-flatpak {
@@ -906,6 +907,19 @@ body {
   font-size: calc(11.5px * var(--font-scale, 1));
   padding: 2px 7px;
   letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.col-install-type {
+  white-space: nowrap;
+  min-width: 150px;
+  width: 160px;
+}
+
+.col-menu-status {
+  white-space: nowrap;
+  min-width: 90px;
+  width: 95px;
 }
 
 .table-icon {

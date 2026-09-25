@@ -807,7 +807,7 @@ function renderTable(apps) {
         <strong class="table-app-name">${escapeHtml(app.name)}</strong>
         ${app.generic_name ? `<div class="table-app-generic">${escapeHtml(app.generic_name)}</div>` : ""}
       </td>
-      <td>
+      <td class="col-install-type">
         <span class="badge ${badgeClass}">${escapeHtml(app.source_label)}</span>
       </td>
       <td>
@@ -833,7 +833,7 @@ function renderTable(apps) {
           </div>
         ` : `<span style="color: var(--text-muted);">-</span>`}
       </td>
-      <td>
+      <td class="col-menu-status">
         <span class="badge ${app.in_menu ? "badge-menu" : "badge-hidden"}">
           ${app.in_menu ? "In Menu" : "Hidden"}
         </span>
