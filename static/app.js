@@ -1023,8 +1023,13 @@ function applyAllActiveSettings() {
 
 function applyGitHubNav() {
   const link = document.getElementById("nav-github-link");
-  if (!link) return;
-  link.style.display = userSettings.showGitHubBtn ? "inline-flex" : "none";
+  const settingsNavBadge = document.getElementById("settings-nav-badge");
+  if (link) {
+    link.style.display = userSettings.showGitHubBtn ? "inline-flex" : "none";
+  }
+  if (settingsNavBadge && appUpdateData && appUpdateData.has_update && userSettings.checkForUpdates) {
+    settingsNavBadge.style.display = userSettings.showGitHubBtn ? "none" : "flex";
+  }
 }
 
 let appUpdateData = null;
@@ -1050,7 +1055,11 @@ function checkAppUpdatesAsync(force = false) {
 function renderUpdateUI(data) {
   const ghLink = document.getElementById("nav-github-link");
   const navBadge = document.getElementById("nav-update-badge");
+  const settingsNavBadge = document.getElementById("settings-nav-badge");
   const statusBadge = document.getElementById("update-status-badge");
+  const banner = document.getElementById("settings-update-banner");
+  const bannerVer = document.getElementById("update-banner-version");
+  const bannerLink = document.getElementById("update-banner-link");
 
   if (!userSettings.checkForUpdates) {
     clearUpdateIndicator();
@@ -1058,6 +1067,8 @@ function renderUpdateUI(data) {
   }
 
   if (data && data.has_update) {
+    const cleanVer = data.latest_version.startsWith("v") ? data.latest_version : `v${data.latest_version}`;
+
     if (ghLink) {
       ghLink.classList.add("has-update");
       if (data.release_url) ghLink.href = data.release_url;
@@ -1067,10 +1078,23 @@ function renderUpdateUI(data) {
       navBadge.style.display = "flex";
       navBadge.title = `Update available: ${data.latest_version}`;
     }
+    if (settingsNavBadge) {
+      settingsNavBadge.style.display = userSettings.showGitHubBtn ? "none" : "flex";
+      settingsNavBadge.title = `Update available: ${data.latest_version}`;
+    }
     if (statusBadge) {
       statusBadge.style.display = "inline-block";
-      const cleanVer = data.latest_version.startsWith("v") ? data.latest_version : `v${data.latest_version}`;
       statusBadge.textContent = `${cleanVer} available`;
+    }
+    if (banner) {
+      const dismissedVer = localStorage.getItem("appindex_dismissed_update_version");
+      if (dismissedVer !== data.latest_version) {
+        banner.style.display = "flex";
+        if (bannerVer) bannerVer.textContent = cleanVer;
+        if (bannerLink && data.release_url) bannerLink.href = data.release_url;
+      } else {
+        banner.style.display = "none";
+      }
     }
   } else {
     clearUpdateIndicator();
@@ -1080,7 +1104,9 @@ function renderUpdateUI(data) {
 function clearUpdateIndicator() {
   const ghLink = document.getElementById("nav-github-link");
   const navBadge = document.getElementById("nav-update-badge");
+  const settingsNavBadge = document.getElementById("settings-nav-badge");
   const statusBadge = document.getElementById("update-status-badge");
+  const banner = document.getElementById("settings-update-banner");
 
   if (ghLink) {
     ghLink.classList.remove("has-update");
@@ -1090,8 +1116,14 @@ function clearUpdateIndicator() {
   if (navBadge) {
     navBadge.style.display = "none";
   }
+  if (settingsNavBadge) {
+    settingsNavBadge.style.display = "none";
+  }
   if (statusBadge) {
     statusBadge.style.display = "none";
+  }
+  if (banner) {
+    banner.style.display = "none";
   }
 }
 
@@ -1204,6 +1236,25 @@ function syncSettingsUI() {
       statusBadge.textContent = `${cleanVer} available`;
     } else {
       statusBadge.style.display = "none";
+    }
+  }
+
+  const banner = document.getElementById("settings-update-banner");
+  const bannerVer = document.getElementById("update-banner-version");
+  const bannerLink = document.getElementById("update-banner-link");
+  if (banner) {
+    if (userSettings.checkForUpdates && appUpdateData && appUpdateData.has_update) {
+      const dismissedVer = localStorage.getItem("appindex_dismissed_update_version");
+      if (dismissedVer !== appUpdateData.latest_version) {
+        banner.style.display = "flex";
+        const cleanVer = appUpdateData.latest_version.startsWith("v") ? appUpdateData.latest_version : `v${appUpdateData.latest_version}`;
+        if (bannerVer) bannerVer.textContent = cleanVer;
+        if (bannerLink && appUpdateData.release_url) bannerLink.href = appUpdateData.release_url;
+      } else {
+        banner.style.display = "none";
+      }
+    } else {
+      banner.style.display = "none";
     }
   }
   if (toggleServices) {
@@ -1468,6 +1519,7 @@ function bindSettingsInteractiveEvents() {
       userSettings.openServicesInSameTab = false;
       userSettings.servicesDashboardUrl = "http://localhost:5100";
 
+      localStorage.removeItem("appindex_dismissed_update_version");
       applyAllActiveSettings();
       syncSettingsUI();
       saveSettingsToStorage();
@@ -1475,6 +1527,18 @@ function bindSettingsInteractiveEvents() {
         checkAppUpdatesAsync();
       }
       showToast("Reset all settings to default");
+    });
+  }
+
+  // Settings Update Banner Dismiss
+  const btnDismissBanner = document.getElementById("btn-dismiss-update-banner");
+  if (btnDismissBanner) {
+    btnDismissBanner.addEventListener("click", () => {
+      const banner = document.getElementById("settings-update-banner");
+      if (banner) banner.style.display = "none";
+      if (appUpdateData && appUpdateData.latest_version) {
+        localStorage.setItem("appindex_dismissed_update_version", appUpdateData.latest_version);
+      }
     });
   }
 
