@@ -360,7 +360,7 @@ function setupEventListeners() {
   // Refresh button
   btnRefresh.addEventListener("click", async () => {
     btnRefresh.classList.add("loading");
-    showToast("Scanning system packages...");
+    showToast("Rescanning system packages...");
     try {
       const res = await fetch("/api/refresh", { method: "POST" });
       const data = await res.json();
@@ -370,7 +370,7 @@ function setupEventListeners() {
       renderApplications();
       showToast("Scan complete: " + allApps.length + " applications found");
     } catch (err) {
-      showToast("Failed to scan applications");
+      showToast("Failed to rescan applications");
     } finally {
       btnRefresh.classList.remove("loading");
     }
