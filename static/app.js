@@ -1213,7 +1213,13 @@ function syncSettingsUI() {
     toggleSameTab.checked = Boolean(userSettings.openServicesInSameTab);
   }
   if (sameTabWrapper) {
-    sameTabWrapper.style.display = userSettings.showServicesLink ? "inline-flex" : "none";
+    if (userSettings.showServicesLink) {
+      sameTabWrapper.classList.remove("toggle-disabled");
+      if (toggleSameTab) toggleSameTab.disabled = false;
+    } else {
+      sameTabWrapper.classList.add("toggle-disabled");
+      if (toggleSameTab) toggleSameTab.disabled = true;
+    }
   }
   if (servicesUrlConfig) {
     servicesUrlConfig.style.display = userSettings.showServicesLink ? "flex" : "none";
@@ -1513,7 +1519,13 @@ function bindSettingsInteractiveEvents() {
         servicesUrlConfig.style.display = e.target.checked ? "flex" : "none";
       }
       if (sameTabWrapper) {
-        sameTabWrapper.style.display = e.target.checked ? "inline-flex" : "none";
+        if (e.target.checked) {
+          sameTabWrapper.classList.remove("toggle-disabled");
+          if (toggleSameTab) toggleSameTab.disabled = false;
+        } else {
+          sameTabWrapper.classList.add("toggle-disabled");
+          if (toggleSameTab) toggleSameTab.disabled = true;
+        }
       }
       applyServicesNav();
       saveSettingsToStorage();

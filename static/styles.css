@@ -1843,20 +1843,66 @@ body.density-spacious .app-icon {
   text-decoration: underline;
 }
 
-.companion-toggle-row {
+/* Integrations & Updates Grid */
+.integrations-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
   margin-top: 8px;
+}
+
+.integration-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.integration-card-header {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 6px;
+  min-height: 22px;
+}
+
+.integration-header-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.integration-header-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.integration-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.toggle-label.toggle-disabled {
+  opacity: 0.38;
+  pointer-events: none;
+  cursor: not-allowed;
 }
 
 .services-url-row {
-  margin-top: 10px;
+  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
