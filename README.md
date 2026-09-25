@@ -152,9 +152,12 @@ The script supports standard commands:
 ```bash
 appindex          # Ensure server is running and open in browser (default)
 appindex start    # Start server in background if not running
+appindex stop     # Stop the background server
+appindex restart  # Restart the server with fresh code/settings
 appindex open     # Open browser to http://localhost:8765
 appindex status   # Check server health
 appindex scan     # Trigger a fresh rescan via API
+appindex update   # Automatically update AppIndex to latest release and restart
 ```
 
 ### Desktop Menu Entry

@@ -29,7 +29,7 @@ wait_for_server() {
 ensure_server() {
     if ! is_running; then
         echo "Starting AppIndex server in background on port ${PORT}..."
-        (cd "${SCRIPT_DIR}" && python3 server.py --port "${PORT}" >/dev/null 2>&1 &)
+        nohup python3 "${SCRIPT_DIR}/server.py" --port "${PORT}" >/dev/null 2>&1 &
         wait_for_server
     fi
 }
@@ -71,13 +71,50 @@ case "${ACTION}" in
         curl -s -X POST "${URL}/api/scan"
         echo ""
         ;;
+    stop)
+        if is_running; then
+            echo "Stopping AppIndex server..."
+            pkill -f "server.py.*${PORT}" || true
+            echo "AppIndex server stopped."
+        else
+            echo "AppIndex server is not running."
+        fi
+        ;;
+    restart)
+        echo "Restarting AppIndex server..."
+        pkill -f "server.py.*${PORT}" || true
+        sleep 1
+        ensure_server
+        echo "AppIndex server restarted at ${URL}"
+        ;;
+    update)
+        echo "Checking AppIndex installation type..."
+        if [ -d "${SCRIPT_DIR}/.git" ]; then
+            echo "Updating via git pull..."
+            git -C "${SCRIPT_DIR}" pull --ff-only
+        else
+            echo "Non-git installation detected. Updating via API..."
+            ensure_server
+            curl -s -X POST "${URL}/api/apply-update"
+        fi
+        if is_running; then
+            echo "Restarting server with updated code..."
+            pkill -f "server.py.*${PORT}" || true
+            sleep 1
+            ensure_server
+        fi
+        echo "AppIndex successfully updated."
+        ;;
     *)
-        echo "Usage: $0 [launch|start|open|status|scan]"
-        echo "  launch  Ensure server is running and open browser (default)"
-        echo "  start   Start server in background if not running"
-        echo "  open    Open AppIndex in browser without starting server"
-        echo "  status  Check server status"
-        echo "  scan    Trigger a fresh application scan"
+        echo "Usage: $0 [launch|start|open|status|scan|stop|restart|update]"
+        echo "  launch   Ensure server is running and open browser (default)"
+        echo "  start    Start server in background if not running"
+        echo "  open     Open AppIndex in browser without starting server"
+        echo "  status   Check server status"
+        echo "  scan     Trigger a fresh application scan"
+        echo "  stop     Stop the background server"
+        echo "  restart  Restart the server with fresh configuration"
+        echo "  update   Update AppIndex to latest version and restart"
         exit 1
         ;;
 esac

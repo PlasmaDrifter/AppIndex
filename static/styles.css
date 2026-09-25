@@ -266,14 +266,6 @@ body {
   transform: scale(1.1);
 }
 
-.nav-github-btn.has-update {
-  border-color: var(--accent-orange, #f5a97f);
-}
-
-.nav-github-btn.has-update .nav-github-icon {
-  color: var(--accent-orange, #f5a97f);
-}
-
 .nav-update-badge {
   position: absolute;
   top: -4px;
@@ -290,19 +282,7 @@ body {
   justify-content: center;
   line-height: 1;
   box-shadow: 0 0 0 2px var(--bg-card), 0 2px 4px rgba(0, 0, 0, 0.4);
-  animation: update-pulse 2s infinite ease-in-out;
   pointer-events: none;
-}
-
-@keyframes update-pulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 0 rgba(245, 169, 127, 0.6);
-  }
-  50% {
-    transform: scale(1.12);
-    box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px rgba(245, 169, 127, 0);
-  }
 }
 
 .update-status-badge {
@@ -412,6 +392,93 @@ body {
   background: rgba(245, 169, 127, 0.2);
   border-color: var(--accent-orange, #f5a97f);
   color: var(--accent-orange, #f5a97f);
+}
+
+.update-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.update-banner-apply-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(245, 169, 127, 0.4);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.update-banner-apply-btn:hover {
+  background: rgba(245, 169, 127, 0.2);
+  border-color: var(--accent-orange, #f5a97f);
+  color: var(--accent-orange, #f5a97f);
+}
+
+.update-modal-content {
+  max-width: 380px;
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.update-progress-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.update-progress-body h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.update-progress-body p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.update-modal-backdrop {
+  z-index: 3000 !important;
+}
+
+.update-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(245, 169, 127, 0.2);
+  border-top-color: var(--accent-orange, #f5a97f);
+  border-radius: 50%;
+  animation: spin-loop 0.8s linear infinite;
+}
+
+.update-refresh-loop {
+  width: 44px;
+  height: 44px;
+  color: var(--accent-orange, #f5a97f);
+  flex-shrink: 0;
+}
+
+.spin-loop {
+  animation: spin-loop 1s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes spin-loop {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn-sm {
@@ -565,7 +632,7 @@ body {
 
 .search-box input {
   width: 100%;
-  padding: 8px 34px 8px 38px;
+  padding: 8px 38px 8px 38px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -582,18 +649,32 @@ body {
 
 .clear-btn {
   position: absolute;
-  right: 10px;
+  right: 9px;
   top: 50%;
   transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 16px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-secondary);
   cursor: pointer;
+  padding: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .clear-btn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--accent-blue);
   color: var(--text-primary);
+  transform: translateY(-50%) scale(1.08);
+}
+
+.clear-btn svg {
+  display: block;
 }
 
 .filter-controls {

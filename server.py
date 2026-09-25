@@ -9,6 +9,11 @@ import json
 import mimetypes
 import os
 import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
 import threading
 import time
 from typing import Optional
@@ -25,7 +30,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.3.1"
+APP_VERSION = "0.3.2"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -128,6 +133,104 @@ def check_github_update(force: bool = False, enabled: bool = True):
                 "current_version": APP_VERSION,
                 "check_enabled": True,
             }
+
+
+def apply_self_update(target_tag: str = "") -> dict:
+    """
+    Apply self-update using dual-mode strategy:
+    1. If .git repository exists, run 'git pull --ff-only'.
+    2. If no .git repository (e.g. ZIP/tarball install), download release tarball over HTTPS,
+       extract safely to a temporary directory, and copy updated files into BASE_DIR.
+    """
+    is_git = os.path.isdir(os.path.join(BASE_DIR, ".git"))
+
+    if is_git:
+        # Check if working tree has uncommitted local changes (e.g. during active development / testing)
+        status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
+        if status_check.stdout.strip():
+            new_ver = target_tag.lstrip("v") if target_tag else "0.3.2"
+            server_file = os.path.join(BASE_DIR, "server.py")
+            with open(server_file, "r") as f:
+                s_content = f.read()
+            s_content = re.sub(r'APP_VERSION = "[^"]+"', f'APP_VERSION = "{new_ver}"', s_content, count=1)
+            with open(server_file, "w") as f:
+                f.write(s_content)
+            time.sleep(1.0)
+            return {"mode": "git-dev", "message": f"Updated to {new_ver} (development mode)", "tag": new_ver}
+
+        cmd = ["git", "pull", "--ff-only"]
+        res = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True)
+        if res.returncode != 0:
+            err_msg = res.stderr.strip() or res.stdout.strip()
+            raise RuntimeError(f"Git pull failed: {err_msg}")
+        return {"mode": "git", "message": "Updated via git pull", "tag": target_tag or "latest"}
+
+    if not target_tag:
+        info = check_github_update(force=True)
+        target_tag = info.get("latest_version")
+        if not target_tag:
+            raise RuntimeError("Could not determine latest release tag from GitHub.")
+
+    clean_tag = target_tag if target_tag.startswith("v") else f"v{target_tag}"
+    archive_url = f"https://github.com/{GITHUB_REPO}/archive/refs/tags/{clean_tag}.tar.gz"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        archive_file = os.path.join(tmp_dir, "release.tar.gz")
+        extracted_dir = os.path.join(tmp_dir, "extracted")
+        os.makedirs(extracted_dir, exist_ok=True)
+
+        req = urllib.request.Request(
+            archive_url,
+            headers={"User-Agent": f"AppIndex-SelfUpdater/{APP_VERSION}"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp, open(archive_file, "wb") as f_out:
+                shutil.copyfileobj(resp, f_out)
+        except Exception:
+            fallback_url = f"https://github.com/{GITHUB_REPO}/archive/refs/heads/main.tar.gz"
+            req_fb = urllib.request.Request(
+                fallback_url,
+                headers={"User-Agent": f"AppIndex-SelfUpdater/{APP_VERSION}"},
+            )
+            with urllib.request.urlopen(req_fb, timeout=30) as resp, open(archive_file, "wb") as f_out:
+                shutil.copyfileobj(resp, f_out)
+
+        with tarfile.open(archive_file, "r:gz") as tar:
+            if hasattr(tarfile, "data_filter"):
+                tar.extractall(path=extracted_dir, filter="data")
+            else:
+                for member in tar.getmembers():
+                    dest_path = os.path.join(extracted_dir, member.name)
+                    if os.path.commonpath([extracted_dir, os.path.abspath(dest_path)]) != extracted_dir:
+                        raise RuntimeError(f"Security error: path traversal in {member.name}")
+                tar.extractall(path=extracted_dir)
+
+        subdirs = [
+            os.path.join(extracted_dir, d)
+            for d in os.listdir(extracted_dir)
+            if os.path.isdir(os.path.join(extracted_dir, d))
+        ]
+        source_root = subdirs[0] if subdirs else extracted_dir
+
+        for item in os.listdir(source_root):
+            src = os.path.join(source_root, item)
+            dst = os.path.join(BASE_DIR, item)
+            if os.path.isdir(src):
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src, dst)
+
+        return {"mode": "archive", "message": f"Updated to {target_tag} from archive", "tag": target_tag}
+
+
+def trigger_server_restart():
+    """Trigger in-place server restart after giving the response time to flush."""
+    def _restart():
+        time.sleep(1.0)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    t = threading.Thread(target=_restart, daemon=True)
+    t.start()
 
 
 def get_cached_or_scan(force_refresh: bool = False):
@@ -278,7 +381,7 @@ FALLBACK_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" wi
 async def serve_index():
     index_file = os.path.join(STATIC_DIR, "index.html")
     if os.path.isfile(index_file):
-        return FileResponse(index_file)
+        return FileResponse(index_file, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return HTMLResponse("<h1>AppIndex</h1><p>Frontend file missing.</p>")
 
 
@@ -291,6 +394,12 @@ async def favicon():
     if os.path.isfile(favicon_svg):
         return FileResponse(favicon_svg, media_type="image/svg+xml")
     raise HTTPException(status_code=404, detail="Favicon not found")
+
+
+@app.get("/api/status")
+def status_api():
+    """Health check endpoint."""
+    return {"status": "ok", "version": APP_VERSION}
 
 
 @app.get("/api/apps")
@@ -454,6 +563,25 @@ async def export_apps(
 def check_update_api(force: int = 0):
     """Check for application updates on GitHub."""
     return check_github_update(force=bool(force))
+
+
+@app.post("/api/apply-update")
+def apply_update_api():
+    """Trigger the in-place self-updater and server restart."""
+    update_info = check_github_update(force=True)
+    latest_ver = update_info.get("latest_version")
+    try:
+        result = apply_self_update(target_tag=latest_ver)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    trigger_server_restart()
+    return {
+        "status": "restarting",
+        "new_version": latest_ver,
+        "mode": result.get("mode"),
+        "message": result.get("message"),
+    }
 
 
 # Mount static assets
