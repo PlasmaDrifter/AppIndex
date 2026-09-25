@@ -1333,6 +1333,24 @@ body {
   color: var(--text-primary);
 }
 
+.settings-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.settings-version-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 1px 7px;
+  border-radius: var(--radius-sm, 4px);
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
 .modal-subtitle {
   font-size: 12px;
   color: var(--text-muted);

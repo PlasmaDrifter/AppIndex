@@ -1050,6 +1050,12 @@ function checkAppUpdatesAsync(force = false) {
 function renderUpdateUI(data) {
   if (data) {
     appUpdateData = data;
+    if (data.current_version) {
+      const settingsVer = document.getElementById("settings-app-version");
+      if (settingsVer) {
+        settingsVer.textContent = data.current_version.startsWith("v") ? data.current_version : `v${data.current_version}`;
+      }
+    }
   }
   const ghLink = document.getElementById("nav-github-link");
   const navBadge = document.getElementById("nav-update-badge");
