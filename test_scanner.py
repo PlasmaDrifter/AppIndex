@@ -90,6 +90,29 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("content-type"), "image/svg+xml")
 
+    def test_icon_path_traversal_blocked(self):
+        # Attempt to access sensitive system files via absolute or relative path
+        for attack_path in ["/etc/passwd", "/etc/shadow", "../../../../etc/passwd", "../../../etc/shadow", "system-search/../../../../etc/passwd"]:
+            response = self.client.get(f"/api/icon?path={attack_path}")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers.get("content-type"), "image/svg+xml")
+            self.assertNotIn("root:", response.text)
+
+            response_name = self.client.get(f"/api/icon?name={attack_path}")
+            self.assertEqual(response_name.status_code, 200)
+            self.assertEqual(response_name.headers.get("content-type"), "image/svg+xml")
+            self.assertNotIn("root:", response_name.text)
+
+    def test_desktop_content_path_traversal_blocked(self):
+        # Attempt to read non-desktop files or files outside allowed application directories
+        for attack_path in ["/etc/passwd", "/usr/share/applications/../../../../etc/passwd", "/var/log/syslog"]:
+            response = self.client.get(f"/api/desktop-content?path={attack_path}")
+            self.assertEqual(response.status_code, 403)
+
+        # Non-existent desktop file inside authorized directory returns 404
+        response_missing = self.client.get("/api/desktop-content?path=/usr/share/applications/non_existent_app_12345.desktop")
+        self.assertEqual(response_missing.status_code, 404)
+
     def test_export_endpoint(self):
         response = self.client.get("/api/export?format=csv")
         self.assertEqual(response.status_code, 200)

@@ -16,7 +16,7 @@ import tarfile
 import tempfile
 import threading
 import time
-from typing import Optional
+from typing import Optional, List, Set
 import urllib.request
 from fastapi import FastAPI, Query, HTTPException, Response
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
@@ -30,7 +30,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.3.2"
+APP_VERSION = "0.3.3"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -148,7 +148,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.3.2"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.3.3"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -240,6 +240,64 @@ def get_cached_or_scan(force_refresh: bool = False):
     return _CACHED_DATA
 
 
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".svg", ".xpm", ".ico", ".webp", ".jpg", ".jpeg"}
+
+
+def get_allowed_desktop_dirs() -> List[str]:
+    candidate_dirs = [
+        "/usr/share/applications",
+        "/usr/local/share/applications",
+        os.path.expanduser("~/.local/share/applications"),
+        "/var/lib/flatpak/exports/share/applications",
+        os.path.expanduser("~/.local/share/flatpak/exports/share/applications"),
+    ]
+    resolved = []
+    for d in candidate_dirs:
+        r = os.path.realpath(d)
+        if not r.endswith(os.sep):
+            r += os.sep
+        resolved.append(r)
+    return resolved
+
+
+def get_allowed_icon_dirs() -> List[str]:
+    candidate_dirs = [
+        "/usr/share/icons",
+        "/usr/share/pixmaps",
+        "/usr/local/share/icons",
+        "/usr/local/share/pixmaps",
+        os.path.expanduser("~/.local/share/icons"),
+        os.path.expanduser("~/.icons"),
+        "/var/lib/flatpak/exports/share/icons",
+        os.path.expanduser("~/.local/share/flatpak/exports/share/icons"),
+        STATIC_DIR,
+    ]
+    resolved = []
+    for d in candidate_dirs:
+        r = os.path.realpath(d)
+        if not r.endswith(os.sep):
+            r += os.sep
+        resolved.append(r)
+    return resolved
+
+
+def get_known_scanned_icon_paths() -> Set[str]:
+    """Retrieve verified canonical icon paths discovered from installed desktop files."""
+    data = get_cached_applications()
+    paths = set()
+    for app in data.get("applications", []):
+        icon = app.get("icon")
+        if icon and (os.path.isabs(icon) or "/" in icon or "\\" in icon):
+            if icon.startswith("file://"):
+                icon = icon[7:]
+            try:
+                real = os.path.realpath(icon)
+                paths.add(real)
+            except Exception:
+                pass
+    return paths
+
+
 # Known common desktop icon themes to search in order of priority
 COMMON_ICON_THEMES = [
     "hicolor",
@@ -256,7 +314,7 @@ COMMON_ICON_THEMES = [
 
 
 def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
-    """Resolve an icon name or path to an existing local file."""
+    """Resolve an icon name or path to an existing local file safely."""
     if not icon_name_or_path:
         return None
 
@@ -264,49 +322,87 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
     if icon_name_or_path.startswith("file://"):
         icon_name_or_path = icon_name_or_path[7:]
 
-    # If already an existing absolute path
-    if os.path.isabs(icon_name_or_path) and os.path.isfile(icon_name_or_path):
-        return icon_name_or_path
+    # Check if absolute path or path with separators
+    if os.path.isabs(icon_name_or_path) or "/" in icon_name_or_path or "\\" in icon_name_or_path:
+        canonical = os.path.realpath(icon_name_or_path)
+        _, ext = os.path.splitext(canonical)
+        if ext.lower() not in ALLOWED_IMAGE_EXTENSIONS:
+            return None
+
+        allowed_dirs = get_allowed_icon_dirs()
+        in_allowed_dir = any(canonical.startswith(ad) for ad in allowed_dirs)
+        in_known_icons = canonical in get_known_scanned_icon_paths()
+
+        if (in_allowed_dir or in_known_icons) and os.path.isfile(canonical):
+            return canonical
+        return None
+
+    # Treat as theme icon name: strictly sanitize to safe identifier characters
+    clean_name = os.path.basename(icon_name_or_path.strip())
+    if not clean_name or not re.match(r"^[a-zA-Z0-9_\.\-\+@]+$", clean_name):
+        return None
+
+    allowed_dirs = get_allowed_icon_dirs()
 
     # Try standard XDG Icon lookup across desktop themes
     for theme in COMMON_ICON_THEMES:
         try:
-            found = xdg.IconTheme.getIconPath(icon_name_or_path, theme=theme)
-            if found and os.path.isfile(found):
-                return found
+            found = xdg.IconTheme.getIconPath(clean_name, theme=theme)
+            if found:
+                canonical = os.path.realpath(found)
+                _, ext = os.path.splitext(canonical)
+                if ext.lower() in ALLOWED_IMAGE_EXTENSIONS:
+                    if any(canonical.startswith(ad) for ad in allowed_dirs) and os.path.isfile(canonical):
+                        return canonical
         except Exception:
             pass
 
     # Try with common extensions across themes
     for ext in [".png", ".svg", ".xpm"]:
-        if not icon_name_or_path.endswith(ext):
-            for theme in COMMON_ICON_THEMES:
-                try:
-                    f = xdg.IconTheme.getIconPath(icon_name_or_path + ext, theme=theme)
-                    if f and os.path.isfile(f):
-                        return f
-                except Exception:
-                    pass
-        pix = f"/usr/share/pixmaps/{icon_name_or_path}{ext}"
-        if os.path.isfile(pix):
+        test_name = clean_name if clean_name.endswith(ext) else clean_name + ext
+        for theme in COMMON_ICON_THEMES:
+            try:
+                f = xdg.IconTheme.getIconPath(test_name, theme=theme)
+                if f:
+                    canonical = os.path.realpath(f)
+                    if any(canonical.startswith(ad) for ad in allowed_dirs) and os.path.isfile(canonical):
+                        return canonical
+            except Exception:
+                pass
+
+        pix = os.path.realpath(os.path.join("/usr/share/pixmaps", test_name))
+        if pix.startswith("/usr/share/pixmaps" + os.sep) and os.path.isfile(pix):
             return pix
 
     # Search in pixmaps without extension
-    pix_direct = f"/usr/share/pixmaps/{icon_name_or_path}"
-    if os.path.isfile(pix_direct):
-        return pix_direct
+    pix_direct = os.path.realpath(os.path.join("/usr/share/pixmaps", clean_name))
+    _, ext_direct = os.path.splitext(pix_direct)
+    if ext_direct.lower() in ALLOWED_IMAGE_EXTENSIONS:
+        if pix_direct.startswith("/usr/share/pixmaps" + os.sep) and os.path.isfile(pix_direct):
+            return pix_direct
 
     return None
 
 
 def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
     """Convert an XPM file to PNG bytes for modern browser compatibility."""
-    if Image is None or not os.path.isfile(xpm_path):
+    if Image is None:
+        return None
+
+    canonical = os.path.realpath(xpm_path)
+    if not canonical.endswith(".xpm"):
+        return None
+
+    allowed_dirs = get_allowed_icon_dirs()
+    if not any(canonical.startswith(ad) for ad in allowed_dirs) and canonical not in get_known_scanned_icon_paths():
+        return None
+
+    if not os.path.isfile(canonical):
         return None
 
     # First attempt standard Pillow loader
     try:
-        im = Image.open(xpm_path)
+        im = Image.open(canonical)
         buf = io.BytesIO()
         im.save(buf, format="PNG")
         return buf.getvalue()
@@ -315,7 +411,7 @@ def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
 
     # Fallback: robust custom XPM parser for non-standard whitespace / large palettes
     try:
-        with open(xpm_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(canonical, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
 
         strings = re.findall(r"\"([^\"]*)\"", content)
@@ -421,26 +517,31 @@ async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Quer
     if not target:
         return Response(content=FALLBACK_SVG, media_type="image/svg+xml")
 
-    # Security check: never allow directory traversal or network shares
+    # Security check: resolve icon path strictly within allowed icon roots
     resolved = resolve_icon_path(target)
-    if resolved and os.path.isfile(resolved):
-        # Convert legacy .xpm to browser-compatible .png on the fly
-        if resolved.endswith(".xpm"):
-            png_bytes = convert_xpm_to_png(resolved)
-            if png_bytes:
-                return Response(content=png_bytes, media_type="image/png")
+    if resolved:
+        canonical = os.path.realpath(resolved)
+        allowed_dirs = get_allowed_icon_dirs()
+        is_safe = any(canonical.startswith(ad) for ad in allowed_dirs) or (canonical in get_known_scanned_icon_paths())
+        _, ext = os.path.splitext(canonical)
+        if is_safe and ext.lower() in ALLOWED_IMAGE_EXTENSIONS and os.path.isfile(canonical):
+            # Convert legacy .xpm to browser-compatible .png on the fly
+            if canonical.endswith(".xpm"):
+                png_bytes = convert_xpm_to_png(canonical)
+                if png_bytes:
+                    return Response(content=png_bytes, media_type="image/png")
 
-        mime, _ = mimetypes.guess_type(resolved)
-        if not mime:
-            if resolved.endswith(".svg"):
-                mime = "image/svg+xml"
-            elif resolved.endswith(".png"):
-                mime = "image/png"
-            elif resolved.endswith(".xpm"):
-                mime = "image/x-xpixmap"
-            else:
-                mime = "application/octet-stream"
-        return FileResponse(resolved, media_type=mime)
+            mime, _ = mimetypes.guess_type(canonical)
+            if not mime:
+                if canonical.endswith(".svg"):
+                    mime = "image/svg+xml"
+                elif canonical.endswith(".png"):
+                    mime = "image/png"
+                elif canonical.endswith(".xpm"):
+                    mime = "image/x-xpixmap"
+                else:
+                    mime = "application/octet-stream"
+            return FileResponse(canonical, media_type=mime)
 
     return Response(content=FALLBACK_SVG, media_type="image/svg+xml")
 
@@ -448,23 +549,20 @@ async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Quer
 @app.get("/api/desktop-content")
 async def get_desktop_content(path: str = Query(...)):
     """Read and return raw desktop file content for viewing in the modal."""
-    if not os.path.isabs(path) or not os.path.isfile(path):
-        raise HTTPException(status_code=404, detail="Desktop file not found")
-
-    # Safety: ensure path is within standard applications paths
-    allowed_dirs = [
-        "/usr/share/applications",
-        "/usr/local/share/applications",
-        os.path.expanduser("~/.local/share/applications"),
-        "/var/lib/flatpak/exports/share/applications",
-        os.path.expanduser("~/.local/share/flatpak/exports/share/applications"),
-    ]
-    if not any(os.path.commonpath([path, d]) == d for d in allowed_dirs if os.path.exists(d)):
+    canonical_path = os.path.realpath(path)
+    if not canonical_path.endswith(".desktop"):
         raise HTTPException(status_code=403, detail="Access denied")
 
+    allowed_dirs = get_allowed_desktop_dirs()
+    if not any(canonical_path.startswith(ad) for ad in allowed_dirs):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not os.path.isfile(canonical_path):
+        raise HTTPException(status_code=404, detail="Desktop file not found")
+
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return {"path": path, "content": f.read()}
+        with open(canonical_path, "r", encoding="utf-8", errors="replace") as f:
+            return {"path": canonical_path, "content": f.read()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
