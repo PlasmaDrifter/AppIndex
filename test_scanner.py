@@ -2,6 +2,7 @@
 Unit and integration tests for AppIndex
 """
 
+import os
 import unittest
 from scanner import scan_all_applications, parse_desktop_file, extract_executable
 from fastapi.testclient import TestClient
@@ -112,6 +113,14 @@ class TestAPI(unittest.TestCase):
         # Non-existent desktop file inside authorized directory returns 404
         response_missing = self.client.get("/api/desktop-content?path=/usr/share/applications/non_existent_app_12345.desktop")
         self.assertEqual(response_missing.status_code, 404)
+
+    def test_flatpak_icons_resolve(self):
+        # Verify Flatpak application icon lookup
+        from server import resolve_icon_path
+        for icon_name in ["org.qbittorrent.qBittorrent", "com.github.tchx84.Flatseal", "io.github.kolunmi.Bazaar"]:
+            path = resolve_icon_path(icon_name)
+            self.assertIsNotNone(path, f"Failed to resolve Flatpak icon {icon_name}")
+            self.assertTrue(os.path.isfile(path))
 
     def test_export_endpoint(self):
         response = self.client.get("/api/export?format=csv")

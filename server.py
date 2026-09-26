@@ -4,6 +4,7 @@ Serves the web dashboard, REST API, icon resolver, and desktop file inspector.
 """
 
 import csv
+import glob
 import io
 import json
 import mimetypes
@@ -30,7 +31,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.3.3"
+APP_VERSION = "0.3.4"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -148,7 +149,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.3.3"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.3.4"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -248,8 +249,8 @@ def get_allowed_desktop_dirs() -> List[str]:
         "/usr/share/applications",
         "/usr/local/share/applications",
         os.path.expanduser("~/.local/share/applications"),
-        "/var/lib/flatpak/exports/share/applications",
-        os.path.expanduser("~/.local/share/flatpak/exports/share/applications"),
+        "/var/lib/flatpak",
+        os.path.expanduser("~/.local/share/flatpak"),
     ]
     resolved = []
     for d in candidate_dirs:
@@ -268,8 +269,8 @@ def get_allowed_icon_dirs() -> List[str]:
         "/usr/local/share/pixmaps",
         os.path.expanduser("~/.local/share/icons"),
         os.path.expanduser("~/.icons"),
-        "/var/lib/flatpak/exports/share/icons",
-        os.path.expanduser("~/.local/share/flatpak/exports/share/icons"),
+        "/var/lib/flatpak",
+        os.path.expanduser("~/.local/share/flatpak"),
         STATIC_DIR,
     ]
     resolved = []
@@ -283,7 +284,7 @@ def get_allowed_icon_dirs() -> List[str]:
 
 def get_known_scanned_icon_paths() -> Set[str]:
     """Retrieve verified canonical icon paths discovered from installed desktop files."""
-    data = get_cached_applications()
+    data = get_cached_or_scan()
     paths = set()
     for app in data.get("applications", []):
         icon = app.get("icon")
@@ -296,6 +297,22 @@ def get_known_scanned_icon_paths() -> Set[str]:
             except Exception:
                 pass
     return paths
+
+
+def find_flatpak_appstream_icon(clean_name: str, allowed_dirs: List[str]) -> Optional[str]:
+    """Find Flatpak icon in Flatpak AppStream icon caches."""
+    base_dirs = [
+        "/var/lib/flatpak/appstream/*/*/active/icons",
+        os.path.expanduser("~/.local/share/flatpak/appstream/*/*/active/icons"),
+    ]
+    for b in base_dirs:
+        for icons_root in glob.glob(b):
+            for size in ["128x128", "64x64", "flatpak"]:
+                for ext in [".png", ".svg"]:
+                    candidate = os.path.realpath(os.path.join(icons_root, size, f"{clean_name}{ext}"))
+                    if any(candidate.startswith(ad) for ad in allowed_dirs) and os.path.isfile(candidate):
+                        return candidate
+    return None
 
 
 # Known common desktop icon themes to search in order of priority
@@ -373,6 +390,11 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
         pix = os.path.realpath(os.path.join("/usr/share/pixmaps", test_name))
         if pix.startswith("/usr/share/pixmaps" + os.sep) and os.path.isfile(pix):
             return pix
+
+    # Search in Flatpak AppStream icon cache
+    appstream_icon = find_flatpak_appstream_icon(clean_name, allowed_dirs)
+    if appstream_icon:
+        return appstream_icon
 
     # Search in pixmaps without extension
     pix_direct = os.path.realpath(os.path.join("/usr/share/pixmaps", clean_name))
