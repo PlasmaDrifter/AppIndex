@@ -1140,6 +1140,20 @@ body {
   border-color: var(--accent-blue);
 }
 
+.copy-cmd-btn.btn-copied,
+.copy-small-btn.btn-copied,
+.btn.btn-copied {
+  background-color: var(--accent-green, #a6e3a1) !important;
+  color: #181926 !important;
+  border-color: var(--accent-green, #a6e3a1) !important;
+  font-weight: 600;
+}
+
+.copy-icon-btn.btn-copied {
+  color: var(--accent-green, #a6e3a1) !important;
+  border-color: var(--accent-green, #a6e3a1) !important;
+}
+
 .card-footer {
   display: flex;
   justify-content: space-between;
