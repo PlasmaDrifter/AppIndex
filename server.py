@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 import threading
 import time
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Tuple
 import urllib.request
 from fastapi import FastAPI, Query, HTTPException, Response
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
@@ -31,7 +31,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.3.4"
+APP_VERSION = "0.3.5"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -149,7 +149,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.3.4"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.3.5"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -241,10 +241,10 @@ def get_cached_or_scan(force_refresh: bool = False):
     return _CACHED_DATA
 
 
-ALLOWED_IMAGE_EXTENSIONS = {".png", ".svg", ".xpm", ".ico", ".webp", ".jpg", ".jpeg"}
+ALLOWED_IMAGE_EXTENSIONS: Tuple[str, ...] = (".png", ".svg", ".xpm", ".ico", ".webp", ".jpg", ".jpeg")
 
 
-def get_allowed_desktop_dirs() -> List[str]:
+def get_allowed_desktop_dirs() -> Tuple[str, ...]:
     candidate_dirs = [
         "/usr/share/applications",
         "/usr/local/share/applications",
@@ -258,10 +258,10 @@ def get_allowed_desktop_dirs() -> List[str]:
         if not r.endswith(os.sep):
             r += os.sep
         resolved.append(r)
-    return resolved
+    return tuple(resolved)
 
 
-def get_allowed_icon_dirs() -> List[str]:
+def get_allowed_icon_dirs() -> Tuple[str, ...]:
     candidate_dirs = [
         "/usr/share/icons",
         "/usr/share/pixmaps",
@@ -279,7 +279,14 @@ def get_allowed_icon_dirs() -> List[str]:
         if not r.endswith(os.sep):
             r += os.sep
         resolved.append(r)
-    return resolved
+    # Include parent directories of verified icons discovered during desktop file scans
+    for p in get_known_scanned_icon_paths():
+        d = os.path.dirname(p)
+        if not d.endswith(os.sep):
+            d += os.sep
+        if d not in resolved:
+            resolved.append(d)
+    return tuple(resolved)
 
 
 def get_known_scanned_icon_paths() -> Set[str]:
@@ -299,7 +306,7 @@ def get_known_scanned_icon_paths() -> Set[str]:
     return paths
 
 
-def find_flatpak_appstream_icon(clean_name: str, allowed_dirs: List[str]) -> Optional[str]:
+def find_flatpak_appstream_icon(clean_name: str, allowed_dirs: Tuple[str, ...]) -> Optional[str]:
     """Find Flatpak icon in Flatpak AppStream icon caches."""
     base_dirs = [
         "/var/lib/flatpak/appstream/*/*/active/icons",
@@ -310,8 +317,9 @@ def find_flatpak_appstream_icon(clean_name: str, allowed_dirs: List[str]) -> Opt
             for size in ["128x128", "64x64", "flatpak"]:
                 for ext in [".png", ".svg"]:
                     candidate = os.path.realpath(os.path.join(icons_root, size, f"{clean_name}{ext}"))
-                    if any(candidate.startswith(ad) for ad in allowed_dirs) and os.path.isfile(candidate):
-                        return candidate
+                    if candidate.startswith(allowed_dirs):
+                        if os.path.isfile(candidate):
+                            return candidate
     return None
 
 
@@ -339,19 +347,15 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
     if icon_name_or_path.startswith("file://"):
         icon_name_or_path = icon_name_or_path[7:]
 
+    allowed_dirs = get_allowed_icon_dirs()
+
     # Check if absolute path or path with separators
     if os.path.isabs(icon_name_or_path) or "/" in icon_name_or_path or "\\" in icon_name_or_path:
         canonical = os.path.realpath(icon_name_or_path)
-        _, ext = os.path.splitext(canonical)
-        if ext.lower() not in ALLOWED_IMAGE_EXTENSIONS:
-            return None
-
-        allowed_dirs = get_allowed_icon_dirs()
-        in_allowed_dir = any(canonical.startswith(ad) for ad in allowed_dirs)
-        in_known_icons = canonical in get_known_scanned_icon_paths()
-
-        if (in_allowed_dir or in_known_icons) and os.path.isfile(canonical):
-            return canonical
+        if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS):
+            if canonical.startswith(allowed_dirs):
+                if os.path.isfile(canonical):
+                    return canonical
         return None
 
     # Treat as theme icon name: strictly sanitize to safe identifier characters
@@ -359,18 +363,16 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
     if not clean_name or not re.match(r"^[a-zA-Z0-9_\.\-\+@]+$", clean_name):
         return None
 
-    allowed_dirs = get_allowed_icon_dirs()
-
     # Try standard XDG Icon lookup across desktop themes
     for theme in COMMON_ICON_THEMES:
         try:
             found = xdg.IconTheme.getIconPath(clean_name, theme=theme)
             if found:
                 canonical = os.path.realpath(found)
-                _, ext = os.path.splitext(canonical)
-                if ext.lower() in ALLOWED_IMAGE_EXTENSIONS:
-                    if any(canonical.startswith(ad) for ad in allowed_dirs) and os.path.isfile(canonical):
-                        return canonical
+                if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS):
+                    if canonical.startswith(allowed_dirs):
+                        if os.path.isfile(canonical):
+                            return canonical
         except Exception:
             pass
 
@@ -382,14 +384,18 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
                 f = xdg.IconTheme.getIconPath(test_name, theme=theme)
                 if f:
                     canonical = os.path.realpath(f)
-                    if any(canonical.startswith(ad) for ad in allowed_dirs) and os.path.isfile(canonical):
-                        return canonical
+                    if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS):
+                        if canonical.startswith(allowed_dirs):
+                            if os.path.isfile(canonical):
+                                return canonical
             except Exception:
                 pass
 
         pix = os.path.realpath(os.path.join("/usr/share/pixmaps", test_name))
-        if pix.startswith("/usr/share/pixmaps" + os.sep) and os.path.isfile(pix):
-            return pix
+        if pix.endswith(ALLOWED_IMAGE_EXTENSIONS):
+            if pix.startswith(allowed_dirs):
+                if os.path.isfile(pix):
+                    return pix
 
     # Search in Flatpak AppStream icon cache
     appstream_icon = find_flatpak_appstream_icon(clean_name, allowed_dirs)
@@ -398,10 +404,10 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
 
     # Search in pixmaps without extension
     pix_direct = os.path.realpath(os.path.join("/usr/share/pixmaps", clean_name))
-    _, ext_direct = os.path.splitext(pix_direct)
-    if ext_direct.lower() in ALLOWED_IMAGE_EXTENSIONS:
-        if pix_direct.startswith("/usr/share/pixmaps" + os.sep) and os.path.isfile(pix_direct):
-            return pix_direct
+    if pix_direct.endswith(ALLOWED_IMAGE_EXTENSIONS):
+        if pix_direct.startswith(allowed_dirs):
+            if os.path.isfile(pix_direct):
+                return pix_direct
 
     return None
 
@@ -416,75 +422,73 @@ def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
         return None
 
     allowed_dirs = get_allowed_icon_dirs()
-    if not any(canonical.startswith(ad) for ad in allowed_dirs) and canonical not in get_known_scanned_icon_paths():
-        return None
+    if canonical.startswith(allowed_dirs):
+        if os.path.isfile(canonical):
+            # First attempt standard Pillow loader
+            try:
+                im = Image.open(canonical)
+                buf = io.BytesIO()
+                im.save(buf, format="PNG")
+                return buf.getvalue()
+            except Exception:
+                pass
 
-    if not os.path.isfile(canonical):
-        return None
+            # Fallback: robust custom XPM parser for non-standard whitespace / large palettes
+            try:
+                with open(canonical, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
 
-    # First attempt standard Pillow loader
-    try:
-        im = Image.open(canonical)
-        buf = io.BytesIO()
-        im.save(buf, format="PNG")
-        return buf.getvalue()
-    except Exception:
-        pass
+                strings = re.findall(r"\"([^\"]*)\"", content)
+                if not strings:
+                    return None
 
-    # Fallback: robust custom XPM parser for non-standard whitespace / large palettes
-    try:
-        with open(canonical, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read()
+                parts = strings[0].split()
+                if len(parts) < 4:
+                    return None
 
-        strings = re.findall(r"\"([^\"]*)\"", content)
-        if not strings:
-            return None
+                width, height, ncolors, cpp = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
 
-        parts = strings[0].split()
-        if len(parts) < 4:
-            return None
+                palette = {}
+                for i in range(1, ncolors + 1):
+                    line = strings[i]
+                    key = line[:cpp]
+                    rest = line[cpp:]
+                    m = re.search(r"c\s+([^\s]+)", rest)
+                    if m:
+                        val = m.group(1)
+                        if val.lower() == "none":
+                            palette[key] = (0, 0, 0, 0)
+                        elif val.startswith("#"):
+                            hex_str = val[1:]
+                            if len(hex_str) == 6:
+                                r = int(hex_str[0:2], 16)
+                                g = int(hex_str[2:4], 16)
+                                b = int(hex_str[4:6], 16)
+                                palette[key] = (r, g, b, 255)
+                            elif len(hex_str) == 12:
+                                r = int(hex_str[0:2], 16)
+                                g = int(hex_str[4:6], 16)
+                                b = int(hex_str[8:10], 16)
+                                palette[key] = (r, g, b, 255)
+                        else:
+                            palette[key] = (0, 0, 0, 255)
 
-        width, height, ncolors, cpp = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+                pixel_lines = strings[ncolors + 1 : ncolors + 1 + height]
+                img = Image.new("RGBA", (width, height))
+                pixels = img.load()
 
-        palette = {}
-        for i in range(1, ncolors + 1):
-            line = strings[i]
-            key = line[:cpp]
-            rest = line[cpp:]
-            m = re.search(r"c\s+([^\s]+)", rest)
-            if m:
-                val = m.group(1)
-                if val.lower() == "none":
-                    palette[key] = (0, 0, 0, 0)
-                elif val.startswith("#"):
-                    hex_str = val[1:]
-                    if len(hex_str) == 6:
-                        r = int(hex_str[0:2], 16)
-                        g = int(hex_str[2:4], 16)
-                        b = int(hex_str[4:6], 16)
-                        palette[key] = (r, g, b, 255)
-                    elif len(hex_str) == 12:
-                        r = int(hex_str[0:2], 16)
-                        g = int(hex_str[4:6], 16)
-                        b = int(hex_str[8:10], 16)
-                        palette[key] = (r, g, b, 255)
-                else:
-                    palette[key] = (0, 0, 0, 255)
+                for y, line in enumerate(pixel_lines):
+                    for x in range(width):
+                        k = line[x * cpp : (x + 1) * cpp]
+                        pixels[x, y] = palette.get(k, (0, 0, 0, 0))
 
-        pixel_lines = strings[ncolors + 1 : ncolors + 1 + height]
-        img = Image.new("RGBA", (width, height))
-        pixels = img.load()
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                return buf.getvalue()
+            except Exception:
+                return None
 
-        for y, line in enumerate(pixel_lines):
-            for x in range(width):
-                k = line[x * cpp : (x + 1) * cpp]
-                pixels[x, y] = palette.get(k, (0, 0, 0, 0))
-
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return buf.getvalue()
-    except Exception:
-        return None
+    return None
 
 
 # Default fallback SVG icon
@@ -543,27 +547,27 @@ async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Quer
     resolved = resolve_icon_path(target)
     if resolved:
         canonical = os.path.realpath(resolved)
-        allowed_dirs = get_allowed_icon_dirs()
-        is_safe = any(canonical.startswith(ad) for ad in allowed_dirs) or (canonical in get_known_scanned_icon_paths())
-        _, ext = os.path.splitext(canonical)
-        if is_safe and ext.lower() in ALLOWED_IMAGE_EXTENSIONS and os.path.isfile(canonical):
-            # Convert legacy .xpm to browser-compatible .png on the fly
-            if canonical.endswith(".xpm"):
-                png_bytes = convert_xpm_to_png(canonical)
-                if png_bytes:
-                    return Response(content=png_bytes, media_type="image/png")
+        if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS):
+            allowed_dirs = get_allowed_icon_dirs()
+            if canonical.startswith(allowed_dirs):
+                if os.path.isfile(canonical):
+                    # Convert legacy .xpm to browser-compatible .png on the fly
+                    if canonical.endswith(".xpm"):
+                        png_bytes = convert_xpm_to_png(canonical)
+                        if png_bytes:
+                            return Response(content=png_bytes, media_type="image/png")
 
-            mime, _ = mimetypes.guess_type(canonical)
-            if not mime:
-                if canonical.endswith(".svg"):
-                    mime = "image/svg+xml"
-                elif canonical.endswith(".png"):
-                    mime = "image/png"
-                elif canonical.endswith(".xpm"):
-                    mime = "image/x-xpixmap"
-                else:
-                    mime = "application/octet-stream"
-            return FileResponse(canonical, media_type=mime)
+                    mime, _ = mimetypes.guess_type(canonical)
+                    if not mime:
+                        if canonical.endswith(".svg"):
+                            mime = "image/svg+xml"
+                        elif canonical.endswith(".png"):
+                            mime = "image/png"
+                        elif canonical.endswith(".xpm"):
+                            mime = "image/x-xpixmap"
+                        else:
+                            mime = "application/octet-stream"
+                    return FileResponse(canonical, media_type=mime)
 
     return Response(content=FALLBACK_SVG, media_type="image/svg+xml")
 
@@ -572,21 +576,17 @@ async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Quer
 async def get_desktop_content(path: str = Query(...)):
     """Read and return raw desktop file content for viewing in the modal."""
     canonical_path = os.path.realpath(path)
-    if not canonical_path.endswith(".desktop"):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    allowed_dirs = get_allowed_desktop_dirs()
-    if not any(canonical_path.startswith(ad) for ad in allowed_dirs):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    if not os.path.isfile(canonical_path):
-        raise HTTPException(status_code=404, detail="Desktop file not found")
-
-    try:
-        with open(canonical_path, "r", encoding="utf-8", errors="replace") as f:
-            return {"path": canonical_path, "content": f.read()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    if canonical_path.endswith(".desktop"):
+        allowed_dirs = get_allowed_desktop_dirs()
+        if canonical_path.startswith(allowed_dirs):
+            if os.path.isfile(canonical_path):
+                try:
+                    with open(canonical_path, "r", encoding="utf-8", errors="replace") as f:
+                        return {"path": canonical_path, "content": f.read()}
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=404, detail="Desktop file not found")
+    raise HTTPException(status_code=403, detail="Access denied")
 
 
 DEFAULT_EXPORT_FIELDS = [
