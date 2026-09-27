@@ -523,9 +523,12 @@ function setupEventListeners() {
   }
 
   // Modal Copy Command
-  modalCopyCmdBtn.addEventListener("click", () => {
+  modalCopyCmdBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
     if (activeModalApp && activeModalApp.uninstall_command) {
-      copyToClipboard(activeModalApp.uninstall_command, "Uninstall command copied");
+      copyToClipboard(activeModalApp.uninstall_command, "Uninstall command copied", modalCopyCmdBtn);
+    } else {
+      showToast("No uninstall command available");
     }
   });
 
@@ -555,11 +558,17 @@ function setupEventListeners() {
 
   // Modal small copy buttons
   document.querySelectorAll(".copy-small-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
       const targetId = btn.dataset.target;
       const targetElem = document.getElementById(targetId);
       if (targetElem) {
-        copyToClipboard(targetElem.textContent, "Copied to clipboard");
+        const text = targetElem.textContent.trim();
+        if (text && text !== "N/A" && !text.startsWith("Standalone executable")) {
+          copyToClipboard(text, "Copied to clipboard", btn);
+        } else {
+          showToast("Nothing to copy");
+        }
       }
     });
   });
@@ -772,7 +781,7 @@ function renderCards(apps) {
     if (btnCopyPkg) {
       btnCopyPkg.addEventListener("click", (e) => {
         e.stopPropagation();
-        copyToClipboard(app.package_name, "Package name copied: " + app.package_name);
+        copyToClipboard(app.package_name, "Package name copied: " + app.package_name, btnCopyPkg);
       });
     }
 
@@ -780,7 +789,7 @@ function renderCards(apps) {
     if (btnCopyCmd) {
       btnCopyCmd.addEventListener("click", (e) => {
         e.stopPropagation();
-        copyToClipboard(app.uninstall_command, "Uninstall command copied");
+        copyToClipboard(app.uninstall_command, "Uninstall command copied", btnCopyCmd);
       });
     }
 
@@ -855,15 +864,17 @@ function renderTable(apps) {
 
     const btnTableCopyPkg = tr.querySelector(".btn-table-copy-pkg");
     if (btnTableCopyPkg) {
-      btnTableCopyPkg.addEventListener("click", () => {
-        copyToClipboard(app.package_name, "Package name copied: " + app.package_name);
+      btnTableCopyPkg.addEventListener("click", (e) => {
+        e.stopPropagation();
+        copyToClipboard(app.package_name, "Package name copied: " + app.package_name, btnTableCopyPkg);
       });
     }
 
     const btnTableCopy = tr.querySelector(".btn-table-copy");
     if (btnTableCopy) {
-      btnTableCopy.addEventListener("click", () => {
-        copyToClipboard(app.uninstall_command, "Uninstall command copied");
+      btnTableCopy.addEventListener("click", (e) => {
+        e.stopPropagation();
+        copyToClipboard(app.uninstall_command, "Uninstall command copied", btnTableCopy);
       });
     }
 
@@ -931,24 +942,93 @@ function showToast(message) {
   }, 2800);
 }
 
+// Fallback copy implementation for non-secure contexts (e.g. LAN HTTP) or unsupported Clipboard API
+function fallbackCopyText(text) {
+  let success = false;
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.top = "0";
+  ta.style.left = "-9999px";
+  ta.style.width = "2em";
+  ta.style.height = "2em";
+  ta.style.padding = "0";
+  ta.style.border = "none";
+  ta.style.outline = "none";
+  ta.style.boxShadow = "none";
+  ta.style.background = "transparent";
+
+  const prevActive = document.activeElement;
+
+  document.body.appendChild(ta);
+  ta.focus({ preventScroll: true });
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+
+  try {
+    success = document.execCommand("copy");
+  } catch (err) {
+    console.warn("execCommand copy error:", err);
+    success = false;
+  }
+
+  document.body.removeChild(ta);
+
+  if (prevActive && typeof prevActive.focus === "function") {
+    prevActive.focus({ preventScroll: true });
+  }
+
+  return success;
+}
+
 // Copy to clipboard helper
-function copyToClipboard(text, successMsg) {
-  if (!text) return;
-  navigator.clipboard.writeText(text).then(
-    () => {
-      showToast(successMsg || "Copied to clipboard");
-    },
-    () => {
-      // Fallback
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      showToast(successMsg || "Copied to clipboard");
+function copyToClipboard(text, successMsg, triggerBtn) {
+  if (!text) {
+    showToast("Nothing to copy");
+    return;
+  }
+
+  function onCopied() {
+    showToast(successMsg || "Copied to clipboard");
+    if (triggerBtn && triggerBtn instanceof HTMLElement) {
+      const origText = triggerBtn.textContent;
+      const isIconOnly = triggerBtn.classList.contains("copy-icon-btn") || triggerBtn.querySelector("svg");
+      triggerBtn.classList.add("btn-copied");
+      if (!isIconOnly && origText && origText.trim()) {
+        triggerBtn.textContent = "Copied!";
+      }
+      setTimeout(() => {
+        triggerBtn.classList.remove("btn-copied");
+        if (!isIconOnly && origText && origText.trim()) {
+          triggerBtn.textContent = origText;
+        }
+      }, 1500);
     }
-  );
+  }
+
+  // Modern Clipboard API is only accessible in secure contexts (HTTPS or localhost)
+  if (window.isSecureContext && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        onCopied();
+      })
+      .catch((err) => {
+        console.warn("navigator.clipboard.writeText rejected, attempting fallback:", err);
+        if (fallbackCopyText(text)) {
+          onCopied();
+        } else {
+          showToast("Failed to copy to clipboard");
+        }
+      });
+  } else {
+    // Non-secure context (e.g. LAN HTTP http://192.168.1.35:8765) or legacy browser
+    if (fallbackCopyText(text)) {
+      onCopied();
+    } else {
+      showToast("Unable to copy to clipboard");
+    }
+  }
 }
 
 // HTML escape helper

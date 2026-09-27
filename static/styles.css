@@ -56,6 +56,10 @@
   --radius-lg: 14px;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -702,6 +706,14 @@ body {
   cursor: pointer;
 }
 
+#category-filter {
+  min-width: 155px;
+}
+
+#sort-by {
+  min-width: 135px;
+}
+
 .toggle-wrapper {
   display: flex;
   align-items: center;
@@ -792,8 +804,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-bottom: 10px;
-  margin-bottom: 16px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
   border-bottom: 1px solid var(--border-color);
   width: 100%;
 }
@@ -802,7 +814,7 @@ body {
 .filter-tabs {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   overflow-x: auto;
   min-width: 0;
   flex: 1;
@@ -817,9 +829,11 @@ body {
   border-radius: var(--radius-sm);
   cursor: pointer;
   white-space: nowrap;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--font-scale, 1));
   font-weight: 500;
-  transition: all 0.15s ease;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   appearance: none;
   -webkit-appearance: none;
   font-family: inherit;
@@ -836,7 +850,7 @@ body {
   background-color: var(--accent-blue);
   color: var(--btn-primary-text, #181926);
   border-color: var(--accent-blue);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Export Button: Same aesthetics as other tab-btns, subtle yellow tint, anchored right */
@@ -1138,6 +1152,20 @@ body {
   background-color: var(--accent-blue);
   color: var(--btn-primary-text, #181926);
   border-color: var(--accent-blue);
+}
+
+.copy-cmd-btn.btn-copied,
+.copy-small-btn.btn-copied,
+.btn.btn-copied {
+  background-color: var(--accent-green, #a6e3a1) !important;
+  color: #181926 !important;
+  border-color: var(--accent-green, #a6e3a1) !important;
+  font-weight: 600;
+}
+
+.copy-icon-btn.btn-copied {
+  color: var(--accent-green, #a6e3a1) !important;
+  border-color: var(--accent-green, #a6e3a1) !important;
 }
 
 .card-footer {
@@ -1587,7 +1615,25 @@ body.density-compact .toolbar {
   margin-bottom: 8px;
 }
 
+body.density-compact .filter-tabs-bar {
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
 /* Density: Spacious */
+body.density-spacious .tab-btn {
+  padding: 9px 20px;
+  font-size: calc(15px * var(--font-scale, 1));
+}
+
+body.density-spacious .toolbar {
+  margin-bottom: 16px;
+}
+
+body.density-spacious .filter-tabs-bar {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
 body.density-spacious .apps-table th {
   padding: 10px 16px;
 }

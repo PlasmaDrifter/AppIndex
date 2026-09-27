@@ -19,7 +19,7 @@ import threading
 import time
 from typing import Optional, List, Set, Tuple
 import urllib.request
-from fastapi import FastAPI, Query, HTTPException, Response
+from fastapi import FastAPI, Query, HTTPException, Response, Request
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -31,13 +31,24 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.3.5"
+APP_VERSION = "0.4.0"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+
+@app.middleware("http")
+async def add_static_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 
 # In-memory cache
 _CACHED_DATA = None
@@ -149,7 +160,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.3.5"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.4.0"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
