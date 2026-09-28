@@ -31,7 +31,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.4.1"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -160,7 +160,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.4.0"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.4.1"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -173,6 +173,15 @@ def apply_self_update(target_tag: str = "") -> dict:
         cmd = ["git", "pull", "--ff-only"]
         res = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True)
         if res.returncode != 0:
+            # If fast-forward fails (e.g. upstream branch history was squashed or rebased)
+            # and local working tree is clean, fetch and reset to origin/<branch>
+            fetch_res = subprocess.run(["git", "fetch", "--prune", "--tags", "origin"], cwd=BASE_DIR, capture_output=True, text=True)
+            if fetch_res.returncode == 0:
+                branch_res = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True)
+                branch = branch_res.stdout.strip() or "main"
+                reset_res = subprocess.run(["git", "reset", "--hard", f"origin/{branch}"], cwd=BASE_DIR, capture_output=True, text=True)
+                if reset_res.returncode == 0:
+                    return {"mode": "git-reset", "message": f"Updated via git reset to origin/{branch}", "tag": target_tag or "latest"}
             err_msg = res.stderr.strip() or res.stdout.strip()
             raise RuntimeError(f"Git pull failed: {err_msg}")
         return {"mode": "git", "message": "Updated via git pull", "tag": target_tag or "latest"}

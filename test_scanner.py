@@ -179,7 +179,7 @@ class TestAPI(unittest.TestCase):
         from unittest.mock import patch
         with patch("server.apply_self_update") as mock_apply, \
              patch("server.trigger_server_restart") as mock_restart:
-            mock_apply.return_value = {"mode": "git", "message": "Updated via git pull", "tag": "v0.4.0"}
+            mock_apply.return_value = {"mode": "git", "message": "Updated via git pull", "tag": "v0.4.1"}
             response = self.client.post("/api/apply-update")
             self.assertEqual(response.status_code, 200)
             data = response.json()
@@ -200,7 +200,7 @@ class TestSelfUpdater(unittest.TestCase):
             tar_path = os.path.join(temp_dir, "sample.tar.gz")
             with tarfile.open(tar_path, "w:gz") as tar:
                 content = b"print('updated')\n"
-                info = tarfile.TarInfo(name="AppIndex-0.4.0/test_file.py")
+                info = tarfile.TarInfo(name="AppIndex-0.4.1/test_file.py")
                 info.size = len(content)
                 tar.addfile(info, io.BytesIO(content))
 
@@ -212,7 +212,7 @@ class TestSelfUpdater(unittest.TestCase):
                 else:
                     tar.extractall(path=dest_dir)
 
-            extracted_file = os.path.join(dest_dir, "AppIndex-0.4.0", "test_file.py")
+            extracted_file = os.path.join(dest_dir, "AppIndex-0.4.1", "test_file.py")
             self.assertTrue(os.path.isfile(extracted_file))
             with open(extracted_file, "r") as f:
                 self.assertIn("updated", f.read())
