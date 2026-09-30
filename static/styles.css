@@ -2229,13 +2229,59 @@ body.density-spacious .app-icon {
   max-width: 720px;
 }
 
+.export-preset-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 20px;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.export-preset-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.export-preset-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.export-preset-status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background-color: var(--bg-card-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  user-select: none;
+}
+
+.export-preset-status.custom {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+  background-color: rgba(56, 189, 248, 0.12);
+}
+
+.export-preset-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .export-modal-body {
   overflow-y: auto;
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-height: calc(85vh - 130px);
+  max-height: calc(85vh - 170px);
 }
 
 .export-format-selector {

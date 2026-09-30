@@ -439,18 +439,58 @@ function setupEventListeners() {
     });
   }
 
-  // Fields selection helper buttons
-  const btnExportFieldsDefault = document.getElementById("btn-export-fields-default");
-  const btnExportFieldsAll = document.getElementById("btn-export-fields-all");
-  const btnExportFieldsNone = document.getElementById("btn-export-fields-none");
-  if (btnExportFieldsDefault) {
-    btnExportFieldsDefault.addEventListener("click", () => {
-      document.querySelectorAll('input[name="export-field"]').forEach((cb) => {
-        cb.checked = cb.dataset.default === "true";
-      });
-      updateExportSummary();
+  // Global Export Preset Actions (Defaults, Save as Default, Reset)
+  const btnExportGlobalDefaults = document.getElementById("btn-export-global-defaults");
+  const btnExportGlobalSaveDefault = document.getElementById("btn-export-global-save-default");
+  const btnExportGlobalReset = document.getElementById("btn-export-global-reset");
+
+  if (btnExportGlobalDefaults) {
+    btnExportGlobalDefaults.addEventListener("click", () => {
+      const config = getSavedExportConfig();
+      applyExportConfig(config);
+      const isCustom = localStorage.getItem(EXPORT_CONFIG_STORAGE_KEY) !== null;
+      showToast(isCustom ? "Applied your saved export defaults" : "Applied built-in export defaults");
     });
   }
+
+  if (btnExportGlobalSaveDefault) {
+    btnExportGlobalSaveDefault.addEventListener("click", () => {
+      const config = getCurrentExportConfig();
+      if (config.fields.length === 0) {
+        showToast("Please select at least one field to save as default");
+        return;
+      }
+      if (config.sources.length === 0) {
+        showToast("Please select at least one package source to save as default");
+        return;
+      }
+      try {
+        localStorage.setItem(EXPORT_CONFIG_STORAGE_KEY, JSON.stringify(config));
+        updateExportPresetStatus();
+        showToast("Saved current export settings across all sections as your default");
+      } catch (err) {
+        showToast("Failed to save export defaults to local storage");
+      }
+    });
+  }
+
+  if (btnExportGlobalReset) {
+    btnExportGlobalReset.addEventListener("click", () => {
+      try {
+        localStorage.removeItem(EXPORT_CONFIG_STORAGE_KEY);
+        localStorage.removeItem("appindex_export_default_fields");
+      } catch (err) {
+        // ignore
+      }
+      applyExportConfig(FACTORY_EXPORT_CONFIG);
+      updateExportPresetStatus();
+      showToast("Reset all export settings to built-in defaults");
+    });
+  }
+
+  // Fields selection helper buttons
+  const btnExportFieldsAll = document.getElementById("btn-export-fields-all");
+  const btnExportFieldsNone = document.getElementById("btn-export-fields-none");
   if (btnExportFieldsAll) {
     btnExportFieldsAll.addEventListener("click", () => {
       document.querySelectorAll('input[name="export-field"]').forEach((cb) => (cb.checked = true));
@@ -1901,14 +1941,111 @@ function closeSettingsModal() {
 // Custom Export Options Logic
 // ==========================================
 
+const EXPORT_CONFIG_STORAGE_KEY = "appindex_export_default_config";
+const FACTORY_EXPORT_CONFIG = {
+  format: "csv",
+  sources: [
+    "repo_rpm,repo_pacman,repo_apt",
+    "flatpak",
+    "appimage",
+    "steam",
+    "local_tool",
+    "unmanaged,web_app"
+  ],
+  visibility: "all",
+  fields: ["name", "source_label", "package_name"]
+};
+
+function getCurrentExportConfig() {
+  const format = document.querySelector('input[name="export-format"]:checked')?.value || "csv";
+  const sources = Array.from(document.querySelectorAll('input[name="export-source"]:checked')).map((cb) => cb.value);
+  const visibility = document.querySelector('input[name="export-visibility"]:checked')?.value || "all";
+  const fields = Array.from(document.querySelectorAll('input[name="export-field"]:checked')).map((cb) => cb.value);
+  return { format, sources, visibility, fields };
+}
+
+function getSavedExportConfig() {
+  try {
+    const raw = localStorage.getItem(EXPORT_CONFIG_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return {
+          format: parsed.format === "json" ? "json" : "csv",
+          sources: Array.isArray(parsed.sources) ? parsed.sources : FACTORY_EXPORT_CONFIG.sources,
+          visibility: ["all", "in_menu", "hidden"].includes(parsed.visibility) ? parsed.visibility : "all",
+          fields: Array.isArray(parsed.fields) && parsed.fields.length > 0 ? parsed.fields : FACTORY_EXPORT_CONFIG.fields
+        };
+      }
+    }
+    const legacyFieldsRaw = localStorage.getItem("appindex_export_default_fields");
+    if (legacyFieldsRaw) {
+      const parsedFields = JSON.parse(legacyFieldsRaw);
+      if (Array.isArray(parsedFields) && parsedFields.length > 0) {
+        return { ...FACTORY_EXPORT_CONFIG, fields: parsedFields };
+      }
+    }
+  } catch (err) {
+    console.warn("Could not load export default configuration:", err);
+  }
+  return FACTORY_EXPORT_CONFIG;
+}
+
+function updateExportPresetStatus() {
+  const statusEl = document.getElementById("export-preset-status");
+  if (!statusEl) return;
+  const isCustom = localStorage.getItem(EXPORT_CONFIG_STORAGE_KEY) !== null || localStorage.getItem("appindex_export_default_fields") !== null;
+  if (isCustom) {
+    statusEl.textContent = "Custom Defaults Active";
+    statusEl.classList.add("custom");
+  } else {
+    statusEl.textContent = "Built-in Defaults";
+    statusEl.classList.remove("custom");
+  }
+}
+
+function applyExportConfig(config) {
+  // 1. Format
+  const targetFormat = config.format || "csv";
+  document.querySelectorAll('input[name="export-format"]').forEach((radio) => {
+    radio.checked = radio.value === targetFormat;
+    const card = radio.closest(".export-format-card");
+    if (card) {
+      card.classList.toggle("active", radio.checked);
+    }
+  });
+
+  // 2. Sources
+  const sourceSet = new Set(config.sources || []);
+  document.querySelectorAll('input[name="export-source"]').forEach((cb) => {
+    cb.checked = sourceSet.has(cb.value);
+  });
+
+  // 3. Visibility
+  const targetVis = config.visibility || "all";
+  document.querySelectorAll('input[name="export-visibility"]').forEach((radio) => {
+    radio.checked = radio.value === targetVis;
+  });
+
+  // 4. Fields
+  const fieldSet = new Set(config.fields || []);
+  document.querySelectorAll('input[name="export-field"]').forEach((cb) => {
+    cb.checked = fieldSet.has(cb.value);
+  });
+
+  updateExportSummary();
+  updateExportPresetStatus();
+}
+
 function openExportModal() {
   const modal = document.getElementById("export-modal");
   if (modal) {
     modal.style.display = "flex";
     try {
-      updateExportSummary();
+      const config = getSavedExportConfig();
+      applyExportConfig(config);
     } catch (err) {
-      console.error("Error updating export summary:", err);
+      console.error("Error opening export modal:", err);
     }
   }
 }

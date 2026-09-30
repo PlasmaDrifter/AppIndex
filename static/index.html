@@ -582,6 +582,19 @@
           <button id="export-close-btn" class="modal-close" title="Close dialog">&times;</button>
         </div>
 
+        <!-- Export Preset Toolbar (Sub-Header) -->
+        <div class="export-preset-bar">
+          <div class="export-preset-info">
+            <span class="export-preset-label">Export Defaults:</span>
+            <span class="export-preset-status" id="export-preset-status">Built-in Defaults</span>
+          </div>
+          <div class="export-preset-actions">
+            <button type="button" id="btn-export-global-defaults" class="btn btn-outline btn-xs" title="Apply default export configuration across all sections">Defaults</button>
+            <button type="button" id="btn-export-global-save-default" class="btn btn-outline btn-xs" title="Save current settings across all sections as your default">Save as Default</button>
+            <button type="button" id="btn-export-global-reset" class="btn btn-outline btn-xs" title="Reset all settings to built-in factory defaults">Reset</button>
+          </div>
+        </div>
+
         <div class="export-modal-body">
           <!-- Section 1: File Format -->
           <div class="settings-section">
@@ -669,7 +682,6 @@
                 <p class="settings-section-desc">Select which columns to include in the export.</p>
               </div>
               <div class="export-actions-row">
-                <button type="button" id="btn-export-fields-default" class="btn btn-outline btn-xs">Defaults</button>
                 <button type="button" id="btn-export-fields-all" class="btn btn-outline btn-xs">All</button>
                 <button type="button" id="btn-export-fields-none" class="btn btn-outline btn-xs">Clear</button>
               </div>
@@ -688,31 +700,31 @@
                 <span>Package Name (package_name)</span>
               </label>
               <label class="export-check-item">
-                <input type="checkbox" name="export-field" value="package_version" checked data-default="true">
+                <input type="checkbox" name="export-field" value="package_version">
                 <span>Version (package_version)</span>
               </label>
               <label class="export-check-item">
-                <input type="checkbox" name="export-field" value="installed_size" checked data-default="true">
+                <input type="checkbox" name="export-field" value="installed_size">
                 <span>Installed Size (installed_size)</span>
               </label>
               <label class="export-check-item">
-                <input type="checkbox" name="export-field" value="in_menu" checked data-default="true">
+                <input type="checkbox" name="export-field" value="in_menu">
                 <span>Menu Visible (in_menu)</span>
               </label>
               <label class="export-check-item">
-                <input type="checkbox" name="export-field" value="primary_category" checked data-default="true">
+                <input type="checkbox" name="export-field" value="primary_category">
                 <span>Primary Category (primary_category)</span>
               </label>
               <label class="export-check-item">
-                <input type="checkbox" name="export-field" value="exec_command" checked data-default="true">
+                <input type="checkbox" name="export-field" value="exec_command">
                 <span>Exec Command (exec_command)</span>
               </label>
               <label class="export-check-item">
-                <input type="checkbox" name="export-field" value="desktop_path" checked data-default="true">
+                <input type="checkbox" name="export-field" value="desktop_path">
                 <span>Desktop Path (desktop_path)</span>
               </label>
               <label class="export-check-item">
-                <input type="checkbox" name="export-field" value="uninstall_command" checked data-default="true">
+                <input type="checkbox" name="export-field" value="uninstall_command">
                 <span>Uninstall Command (uninstall_command)</span>
               </label>
               <label class="export-check-item">

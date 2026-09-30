@@ -613,13 +613,6 @@ DEFAULT_EXPORT_FIELDS = [
     "name",
     "source_label",
     "package_name",
-    "package_version",
-    "installed_size",
-    "in_menu",
-    "primary_category",
-    "exec_command",
-    "desktop_path",
-    "uninstall_command",
 ]
 
 

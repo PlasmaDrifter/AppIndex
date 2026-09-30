@@ -126,7 +126,8 @@ class TestAPI(unittest.TestCase):
         response = self.client.get("/api/export?format=csv")
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/csv", response.headers.get("content-type", ""))
-        self.assertIn("package_name", response.text)
+        first_line = response.text.splitlines()[0]
+        self.assertEqual(first_line.strip(), "name,source_label,package_name")
 
     def test_export_csv_custom_fields(self):
         response = self.client.get("/api/export?format=csv&fields=name,package_name")
