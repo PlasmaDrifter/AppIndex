@@ -180,7 +180,7 @@ class TestAPI(unittest.TestCase):
         from unittest.mock import patch
         with patch("server.apply_self_update") as mock_apply, \
              patch("server.trigger_server_restart") as mock_restart:
-            mock_apply.return_value = {"mode": "git", "message": "Updated via git pull", "tag": "v0.4.1"}
+            mock_apply.return_value = {"mode": "git", "message": "Updated via git pull", "tag": "v0.4.2"}
             response = self.client.post("/api/apply-update")
             self.assertEqual(response.status_code, 200)
             data = response.json()
