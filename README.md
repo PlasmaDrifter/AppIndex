@@ -4,8 +4,6 @@ Universal Linux Application & Package Inventory Inspector
 
 AppIndex is a lightweight, local web dashboard and system inspector that inventories all applications installed across your Linux system. It automatically discovers, classifies, and manages applications across diverse packaging ecosystems, attributing each application to its underlying package manager or installation source, displaying exact package identifiers, highlighting newly installed and updated versions with transition tracking, and providing one-click copyable uninstall commands.
 
-### How Update & Version Detection Works
-
 AppIndex detects software that has been **recently installed or upgraded on your host system** (it does not query remote repositories for uninstalled upstream updates):
 
 - **When Checks Occur**:
