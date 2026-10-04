@@ -258,6 +258,14 @@ class TestVersionComparison(unittest.TestCase):
         self.assertFalse(is_newer_version("0.2.4", "0.2.4"))
         self.assertFalse(is_newer_version("0.2.3", "0.2.4"))
 
+    def test_recent_hours_api(self):
+        client = TestClient(app)
+        res = client.get("/api/apps?recent_hours=72")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("stats", data)
+        self.assertEqual(data["stats"].get("recent_hours"), 72)
+
 
 if __name__ == "__main__":
     unittest.main()

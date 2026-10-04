@@ -642,7 +642,7 @@ def extract_executable(exec_cmd: str) -> Optional[str]:
     return None
 
 
-def scan_all_applications() -> Dict[str, Any]:
+def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
     """Scan all desktop directories and standalone apps, cross-referencing package managers."""
     distro_info = get_distribution_info()
     active_desktops = get_active_desktop_environments()
@@ -723,7 +723,7 @@ def scan_all_applications() -> Dict[str, Any]:
     repo_source_label = f"{distro_name} Repo ({pkg_label})"
 
     now_epoch = time.time()
-    recent_cutoff = now_epoch - (48 * 3600)
+    recent_cutoff = now_epoch - (max(1, int(recent_hours)) * 3600)
     dnf_transitions = get_recent_dnf_transitions(recent_cutoff) if pkg_type == "rpm" else {}
 
     applications = []
@@ -1012,6 +1012,7 @@ def scan_all_applications() -> Dict[str, Any]:
         "web_app": sum(1 for a in applications if a["source_type"] == "web_app"),
         "unmanaged": sum(1 for a in applications if a["source_type"] == "unmanaged"),
         "recently_updated": sum(1 for a in applications if a.get("is_recent_update")),
+        "recent_hours": max(1, int(recent_hours)),
         "distro": distro_info,
     }
 

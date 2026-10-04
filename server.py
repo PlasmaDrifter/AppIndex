@@ -31,7 +31,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.4.3"
+APP_VERSION = "0.4.4"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -164,7 +164,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.4.3"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.4.4"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -258,10 +258,14 @@ def trigger_server_restart():
     t.start()
 
 
-def get_cached_or_scan(force_refresh: bool = False):
-    global _CACHED_DATA, _CACHED_ALLOWED_ICON_DIRS, _RESOLVED_ICON_CACHE, _XPM_CACHE
-    if _CACHED_DATA is None or force_refresh:
-        _CACHED_DATA = scan_all_applications()
+_CACHED_RECENT_HOURS: int = 48
+
+
+def get_cached_or_scan(force_refresh: bool = False, recent_hours: int = 48):
+    global _CACHED_DATA, _CACHED_RECENT_HOURS, _CACHED_ALLOWED_ICON_DIRS, _RESOLVED_ICON_CACHE, _XPM_CACHE
+    if _CACHED_DATA is None or force_refresh or _CACHED_RECENT_HOURS != recent_hours:
+        _CACHED_DATA = scan_all_applications(recent_hours=recent_hours)
+        _CACHED_RECENT_HOURS = recent_hours
         _CACHED_ALLOWED_ICON_DIRS = None
         _RESOLVED_ICON_CACHE.clear()
         _XPM_CACHE.clear()
@@ -578,15 +582,21 @@ def status_api():
 
 
 @app.get("/api/apps")
-async def get_apps():
+async def get_apps(recent_hours: int = Query(48, ge=1, le=8760)):
     """Return all scanned applications and summary statistics."""
-    return get_cached_or_scan(force_refresh=False)
+    return get_cached_or_scan(force_refresh=False, recent_hours=recent_hours)
 
 
 @app.post("/api/refresh")
-async def refresh_apps():
+async def refresh_apps(recent_hours: int = Query(48, ge=1, le=8760)):
     """Force re-scan of the system applications."""
-    return get_cached_or_scan(force_refresh=True)
+    return get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
+
+
+@app.post("/api/scan")
+async def scan_apps_alias(recent_hours: int = Query(48, ge=1, le=8760)):
+    """Alias for /api/refresh for CLI compat."""
+    return get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
 
 
 @app.api_route("/api/icon", methods=["GET", "HEAD"])

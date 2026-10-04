@@ -235,7 +235,8 @@ let userSettings = {
   openServicesInSameTab: false,
   servicesDashboardUrl: "http://localhost:5100",
   showGitHubBtn: true,
-  checkForUpdates: true
+  checkForUpdates: true,
+  recentHours: 48
 };
 
 // Settings Modal Elements
@@ -405,11 +406,26 @@ function setupEventListeners() {
 
   // Refresh button
   btnRefresh.addEventListener("click", async () => {
+    if (btnRefresh.disabled) return;
+    const btnSpan = btnRefresh.querySelector("span");
+    const originalText = btnSpan ? btnSpan.textContent : "Rescan";
+    btnRefresh.disabled = true;
     btnRefresh.classList.add("loading");
+    if (btnSpan) btnSpan.textContent = "Scanning...";
+
+    if (appsTableContainer) appsTableContainer.classList.add("table-dimmed");
+    if (appsGrid) appsGrid.classList.add("table-dimmed");
+
     showToast("Rescanning system packages...");
+    const minDelay = new Promise((r) => setTimeout(r, 450));
+
     try {
-      const res = await fetch("/api/refresh", { method: "POST" });
-      const data = await res.json();
+      const hours = userSettings.recentHours || 48;
+      const fetchPromise = fetch(`/api/refresh?recent_hours=${hours}`, { method: "POST" }).then((res) => {
+        if (!res.ok) throw new Error("HTTP error " + res.status);
+        return res.json();
+      });
+      const [data] = await Promise.all([fetchPromise, minDelay]);
       allApps = data.applications || [];
       appStats = data.stats || {};
       prepareAppsData(allApps);
@@ -417,9 +433,14 @@ function setupEventListeners() {
       renderApplications();
       showToast("Rescan complete: " + allApps.length + " applications found");
     } catch (err) {
+      console.error("Rescan failed:", err);
       showToast("Failed to rescan applications");
     } finally {
+      if (appsTableContainer) appsTableContainer.classList.remove("table-dimmed");
+      if (appsGrid) appsGrid.classList.remove("table-dimmed");
+      btnRefresh.disabled = false;
       btnRefresh.classList.remove("loading");
+      if (btnSpan) btnSpan.textContent = originalText;
     }
   });
 
@@ -669,7 +690,8 @@ async function loadApplications() {
   appsTableContainer.style.display = "none";
 
   try {
-    const res = await fetch("/api/apps");
+    const hours = userSettings.recentHours || 48;
+    const res = await fetch(`/api/apps?recent_hours=${hours}`);
     const data = await res.json();
     allApps = data.applications || [];
     appStats = data.stats || {};
@@ -1191,7 +1213,8 @@ function loadSavedSettings() {
         openServicesInSameTab: Boolean(parsed.openServicesInSameTab),
         servicesDashboardUrl: parsed.servicesDashboardUrl || "http://localhost:5100",
         showGitHubBtn: parsed.showGitHubBtn !== undefined ? Boolean(parsed.showGitHubBtn) : true,
-        checkForUpdates: parsed.checkForUpdates !== undefined ? Boolean(parsed.checkForUpdates) : true
+        checkForUpdates: parsed.checkForUpdates !== undefined ? Boolean(parsed.checkForUpdates) : true,
+        recentHours: typeof parsed.recentHours === "number" && parsed.recentHours > 0 ? parsed.recentHours : 48
       };
     }
   } catch (err) {
@@ -1598,6 +1621,56 @@ function syncSettingsUI() {
   if (servicesUrlInput) {
     servicesUrlInput.value = userSettings.servicesDashboardUrl || "http://localhost:5100";
   }
+
+  // Sync Recent Hours Preset Buttons
+  const recentHours = userSettings.recentHours || 48;
+  const recentBadge = document.getElementById("recent-hours-badge");
+  if (recentBadge) {
+    recentBadge.textContent = formatRecentHoursBadge(recentHours);
+  }
+  const presetContainer = document.getElementById("recent-hours-presets");
+  if (presetContainer) {
+    presetContainer.querySelectorAll(".recent-hours-btn").forEach((btn) => {
+      btn.classList.toggle("active", parseInt(btn.dataset.hours, 10) === recentHours);
+    });
+  }
+}
+
+function formatRecentHoursBadge(hours) {
+  if (hours % 24 === 0) {
+    const days = hours / 24;
+    return days === 1 ? "24h (1d)" : `${hours}h (${days}d)`;
+  }
+  return `${hours} Hours`;
+}
+
+async function setRecentSoftwareHours(hours, showNotification = true) {
+  const cleanHours = Math.max(1, Math.min(8760, parseInt(hours, 10) || 48));
+  userSettings.recentHours = cleanHours;
+  saveSettingsToStorage();
+  syncSettingsUI();
+
+  // Reload applications with the new threshold
+  try {
+    if (appsTableContainer) appsTableContainer.classList.add("table-dimmed");
+    if (appsGrid) appsGrid.classList.add("table-dimmed");
+    const res = await fetch(`/api/apps?recent_hours=${cleanHours}`);
+    const data = await res.json();
+    allApps = data.applications || [];
+    appStats = data.stats || {};
+    prepareAppsData(allApps);
+    updateStatsUI();
+    renderApplications();
+    if (showNotification) {
+      showToast(`Recent software threshold set to ${formatRecentHoursBadge(cleanHours)}`);
+    }
+  } catch (err) {
+    console.error("Failed to update software threshold:", err);
+    showToast("Failed to update software threshold");
+  } finally {
+    if (appsTableContainer) appsTableContainer.classList.remove("table-dimmed");
+    if (appsGrid) appsGrid.classList.remove("table-dimmed");
+  }
 }
 
 function renderPresetThemeGrid() {
@@ -1838,6 +1911,7 @@ function bindSettingsInteractiveEvents() {
       userSettings.showServicesLink = false;
       userSettings.openServicesInSameTab = false;
       userSettings.servicesDashboardUrl = "http://localhost:5100";
+      userSettings.recentHours = 48;
 
       localStorage.removeItem("appindex_dismissed_update_version");
       applyAllActiveSettings();
@@ -2004,6 +2078,17 @@ function bindSettingsInteractiveEvents() {
       }
     });
   });
+
+  // Recent Hours presets
+  const presetsContainer = document.getElementById("recent-hours-presets");
+  if (presetsContainer) {
+    presetsContainer.querySelectorAll(".recent-hours-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const hours = parseInt(btn.dataset.hours, 10);
+        setRecentSoftwareHours(hours);
+      });
+    });
+  }
 }
 
 function openSettingsModal() {
