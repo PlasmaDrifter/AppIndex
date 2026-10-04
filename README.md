@@ -13,16 +13,7 @@ AppIndex detects software that has been **recently installed or upgraded on your
   - **Dashboard Load**: Loads the cached inventory upon opening the web UI, scanning if the cache is empty.
   - **Manual Rescan**: Clicking the **Rescan** button in the dashboard (or running `appindex scan`) forces an immediate, fresh scan across all package managers.
 
-- **48-Hour Detection Window**:
-  - During each scan, AppIndex evaluates transactions and file metadata against a **48-hour cutoff window**.
-  - **DNF / RPM**: Queries `dnf history` (or `dnf5 history`) to detect packages upgraded or installed in the last 48 hours, capturing previous-to-new version transitions (e.g. `1.2.0 -> 1.2.1`).
-  - **Flatpaks**: Checks deployment directory metadata and timestamps in `/var/lib/flatpak/app/` and `~/.local/share/flatpak/app/`.
-  - **Steam Games & AppImages**: Checks file modification timestamps on Steam app manifests and AppImage binaries.
-  - Any software changed within the 48-hour window is highlighted with an update badge and version transition pill.
-
 ---
-
-## Screenshots
 
 ### Table View
 ![AppIndex Table View](screenshots/appindex-table-view.png)
