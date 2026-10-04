@@ -5,11 +5,14 @@ Classifies installation source (Repo/RPM, Flatpak, AppImage, Steam, Local script
 and extracts package names and uninstall commands.
 """
 
+import datetime
+import glob
 import os
 import re
 import shlex
 import shutil
 import subprocess
+import time
 from typing import Dict, List, Optional, Any
 
 try:
@@ -42,9 +45,155 @@ def format_bytes(sz_bytes: int) -> str:
     return f"{sz_bytes} B"
 
 
+def format_timestamp(epoch: Optional[float]) -> str:
+    """Format Unix epoch timestamp into human-readable string YYYY-MM-DD HH:MM."""
+    if not epoch or epoch <= 0:
+        return ""
+    try:
+        return datetime.datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return ""
+
+
+def get_flatpak_deploy_times() -> Dict[str, float]:
+    """Retrieve mtime of active deployment symlinks for installed Flatpaks."""
+    times = {}
+    patterns = [
+        "/var/lib/flatpak/app/*/*/*/active",
+        os.path.expanduser("~/.local/share/flatpak/app/*/*/*/active"),
+    ]
+    for pat in patterns:
+        for p in glob.glob(pat):
+            try:
+                parts = p.split(os.sep)
+                app_idx = parts.index("app") + 1
+                app_id = parts[app_idx]
+                times[app_id] = os.lstat(p).st_mtime
+            except Exception:
+                pass
+    return times
+
+
+def get_steam_update_time(steam_id: str, default_mtime: float = 0.0) -> float:
+    """Retrieve LastUpdated timestamp from Steam appmanifest file if available."""
+    steam_roots = [
+        os.path.expanduser("~/.local/share/Steam/steamapps"),
+        os.path.expanduser("~/.steam/steam/steamapps"),
+        os.path.expanduser("~/.steam/root/steamapps"),
+    ]
+    for root in steam_roots:
+        acf_path = os.path.join(root, f"appmanifest_{steam_id}.acf")
+        if os.path.exists(acf_path):
+            try:
+                with open(acf_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if '"LastUpdated"' in line:
+                            match = re.search(r'"LastUpdated"\s+"(\d+)"', line)
+                            if match:
+                                return float(match.group(1))
+            except Exception:
+                pass
+            return os.path.getmtime(acf_path)
+    return default_mtime
+
+
+def parse_nevra(nevra_str: str):
+    """Extract package name and version-release from an RPM NEVRA string."""
+    m = re.match(r"^(.+?)-(?:(\d+):)?([^-]+)-([^-]+)\.([^.]+)$", nevra_str)
+    if m:
+        name, epoch, version, release, arch = m.groups()
+        return name, f"{version}-{release}"
+    return nevra_str, ""
+
+
+def get_recent_dnf_transitions(cutoff_epoch: float) -> Dict[str, Dict[str, str]]:
+    """Query recent DNF/DNF5 transaction history for upgraded and replaced versions."""
+    transitions = {}
+    cmd = None
+    if shutil.which("dnf"):
+        cmd = "dnf"
+    elif shutil.which("dnf5"):
+        cmd = "dnf5"
+    if not cmd:
+        return transitions
+
+    try:
+        proc = subprocess.run([cmd, "history", "list"], capture_output=True, text=True, check=False)
+        if proc.returncode != 0:
+            return transitions
+
+        target_tids = []
+        for line in proc.stdout.splitlines()[1:]:
+            m = re.match(r"^\s*(\d+)\s+.*?\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(\d+)", line)
+            if m:
+                tid, date_str, time_str, altered = m.groups()
+                try:
+                    dt = datetime.datetime.fromisoformat(f"{date_str}T{time_str}")
+                    if dt.timestamp() < cutoff_epoch:
+                        break
+                    if int(altered) > 0:
+                        target_tids.append(tid)
+                except Exception:
+                    continue
+
+        if not target_tids:
+            return transitions
+
+        # Fetch transaction details
+        info_proc = subprocess.run([cmd, "history", "info"] + target_tids, capture_output=True, text=True, check=False)
+        if info_proc.returncode != 0:
+            return transitions
+
+        in_pkgs = False
+        upgraded = {}
+        replaced = {}
+        installed = {}
+
+        for line in info_proc.stdout.splitlines():
+            if "Packages altered:" in line:
+                in_pkgs = True
+                continue
+            if in_pkgs and line.startswith("  ") and not line.startswith("    "):
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    action, nevra = parts[0], parts[1]
+                    name, ver = parse_nevra(nevra)
+                    if action in ("Upgrade", "Upgraded"):
+                        upgraded[name] = ver
+                    elif action in ("Replaced", "Replaced by"):
+                        if name not in replaced:
+                            replaced[name] = ver
+                    elif action in ("Install", "Installed"):
+                        installed[name] = ver
+            elif in_pkgs and line and not line.startswith(" "):
+                in_pkgs = False
+
+        for name, new_ver in upgraded.items():
+            old_ver = replaced.get(name, "")
+            transitions[name] = {
+                "old_version": old_ver,
+                "new_version": new_ver,
+                "version_transition": f"{old_ver} -> {new_ver}" if old_ver else new_ver,
+                "update_action": "Upgrade",
+            }
+        for name, new_ver in installed.items():
+            if name not in transitions:
+                transitions[name] = {
+                    "old_version": "",
+                    "new_version": new_ver,
+                    "version_transition": f"New install ({new_ver})" if new_ver else "Installed",
+                    "update_action": "Install",
+                }
+    except Exception:
+        pass
+
+    return transitions
+
+
 def get_flatpak_installed() -> Dict[str, Dict[str, Any]]:
-    """Query flatpak CLI for all installed applications with metadata."""
+    """Query flatpak CLI for all installed applications with metadata and deploy timestamps."""
     flatpaks = {}
+    deploy_times = get_flatpak_deploy_times()
     try:
         cmd = [
             "flatpak",
@@ -58,6 +207,7 @@ def get_flatpak_installed() -> Dict[str, Dict[str, Any]]:
                 parts = line.split("\t")
                 if len(parts) >= 2:
                     app_id = parts[0].strip()
+                    inst_time = deploy_times.get(app_id, 0.0)
                     flatpaks[app_id] = {
                         "app_id": app_id,
                         "name": parts[1].strip() if len(parts) > 1 else "",
@@ -65,13 +215,15 @@ def get_flatpak_installed() -> Dict[str, Dict[str, Any]]:
                         "branch": parts[3].strip() if len(parts) > 3 else "stable",
                         "installation": parts[4].strip() if len(parts) > 4 else "system",
                         "size": parts[5].strip() if len(parts) > 5 else "",
+                        "install_time": inst_time,
+                        "install_date": format_timestamp(inst_time),
                     }
     except Exception:
         pass
     return flatpaks
 
 
-def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, str]]:
+def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, Any]]:
     """Query RPM database for file paths using native python rpm bindings or rpm CLI."""
     results = {}
     if not file_paths:
@@ -88,12 +240,15 @@ def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, str]]:
                     arch = hdr["arch"]
                     sz = hdr["size"]
                     summary = hdr["summary"]
+                    inst_time = float(hdr["installtime"]) if "installtime" in hdr else 0.0
                     results[filepath] = {
                         "name": pkg_name,
                         "version": version,
                         "arch": arch,
                         "size": format_bytes(sz) if isinstance(sz, int) else "",
                         "summary": summary,
+                        "install_time": inst_time,
+                        "install_date": format_timestamp(inst_time),
                     }
                     break
             return results
@@ -106,7 +261,7 @@ def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, str]]:
         chunk = file_paths[i : i + batch_size]
         for f in chunk:
             try:
-                cmd = ["rpm", "-qf", "--queryformat", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\t%{SIZE}\t%{SUMMARY}\n", f]
+                cmd = ["rpm", "-qf", "--queryformat", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\t%{SIZE}\t%{INSTALLTIME}\t%{SUMMARY}\n", f]
                 res = subprocess.run(cmd, capture_output=True, text=True, check=False)
                 line = res.stdout.strip()
                 if res.returncode == 0 and "\t" in line:
@@ -116,12 +271,19 @@ def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, str]]:
                         sz_str = format_bytes(int(parts[3].strip()))
                     except Exception:
                         pass
+                    inst_time = 0.0
+                    try:
+                        inst_time = float(parts[4].strip())
+                    except Exception:
+                        pass
                     results[f] = {
                         "name": parts[0].strip(),
                         "version": parts[1].strip(),
                         "arch": parts[2].strip() if len(parts) > 2 else "",
                         "size": sz_str,
-                        "summary": parts[4].strip() if len(parts) > 4 else "",
+                        "summary": parts[5].strip() if len(parts) > 5 else "",
+                        "install_time": inst_time,
+                        "install_date": format_timestamp(inst_time),
                     }
             except Exception:
                 pass
@@ -546,7 +708,7 @@ def scan_all_applications() -> Dict[str, Any]:
                 query_files.append(exe)
                 local_binaries_map[rec["path"]] = exe
 
-    file_to_pkg = query_system_package_database(query_files, distro_info)
+    file_to_pkg = query_system_package_database(list(dict.fromkeys(query_files)), distro_info)
 
     distro_raw = distro_info.get("display_name") or distro_info.get("name", "System")
     distro_name = re.sub(r"\b(?:GNU/)?Linux\b", "", distro_raw, flags=re.IGNORECASE).strip()
@@ -559,6 +721,10 @@ def scan_all_applications() -> Dict[str, Any]:
 
     repo_source_type = f"repo_{pkg_type}" if pkg_type in ("rpm", "pacman", "dpkg") else "repo_system"
     repo_source_label = f"{distro_name} Repo ({pkg_label})"
+
+    now_epoch = time.time()
+    recent_cutoff = now_epoch - (48 * 3600)
+    dnf_transitions = get_recent_dnf_transitions(recent_cutoff) if pkg_type == "rpm" else {}
 
     applications = []
     processed_flatpak_ids = set()
@@ -583,6 +749,10 @@ def scan_all_applications() -> Dict[str, Any]:
         uninstall_command = ""
         uninstall_note = ""
         is_override = rec.get("is_override", False)
+        install_time = 0.0
+        install_date = ""
+        version_transition = ""
+        update_action = ""
 
         # Check if Flatpak (either direct in flatpak exports or shadowing a flatpak export)
         flatpak_id = None
@@ -611,6 +781,8 @@ def scan_all_applications() -> Dict[str, Any]:
             if flatpak_id in flatpak_apps:
                 package_version = flatpak_apps[flatpak_id].get("version", "")
                 installed_size = flatpak_apps[flatpak_id].get("size", "")
+                install_time = flatpak_apps[flatpak_id].get("install_time", 0.0)
+                install_date = flatpak_apps[flatpak_id].get("install_date", "")
 
             if is_user_install:
                 uninstall_command = f"flatpak uninstall --user {flatpak_id}"
@@ -631,6 +803,9 @@ def scan_all_applications() -> Dict[str, Any]:
             uninstall_note = "Opens Steam client to uninstall game"
             if not data["primary_category"] or data["primary_category"] == "Other":
                 data["primary_category"] = "Games"
+            def_time = os.path.getmtime(path) if os.path.exists(path) else 0.0
+            install_time = get_steam_update_time(steam_id, def_time)
+            install_date = format_timestamp(install_time)
 
         # Check if AppImage / ~/Applications executable
         elif (
@@ -643,6 +818,10 @@ def scan_all_applications() -> Dict[str, Any]:
             clean_exe = primary_exe.strip("\"'")
             if os.path.exists(clean_exe):
                 processed_appimage_paths.add(os.path.realpath(clean_exe))
+                install_time = os.path.getmtime(clean_exe)
+            elif os.path.exists(path):
+                install_time = os.path.getmtime(path)
+            install_date = format_timestamp(install_time)
             package_name = os.path.basename(clean_exe) if clean_exe else fname
             uninstall_command = f'rm -f "{clean_exe}" "{path}"'
             uninstall_note = "Deletes the portable executable and its menu shortcut"
@@ -659,6 +838,9 @@ def scan_all_applications() -> Dict[str, Any]:
             package_name = fname.replace(".desktop", "")
             uninstall_command = f'rm -f "{path}"'
             uninstall_note = "Removes the web application desktop shortcut"
+            if os.path.exists(path):
+                install_time = os.path.getmtime(path)
+                install_date = format_timestamp(install_time)
 
         # Check if Local User Script / Tool or Local Override of System Package
         elif scope == "local_user":
@@ -674,6 +856,8 @@ def scan_all_applications() -> Dict[str, Any]:
                 package_version = pkg_info["version"]
                 package_arch = pkg_info["arch"]
                 installed_size = pkg_info.get("size", "")
+                install_time = pkg_info.get("install_time", 0.0)
+                install_date = pkg_info.get("install_date", "")
                 uninstall_command = f"{uninstall_prefix} {package_name}"
                 uninstall_note = f"Customized local menu entry overriding system package {package_name}"
                 is_override = True
@@ -684,6 +868,9 @@ def scan_all_applications() -> Dict[str, Any]:
                 uninstall_command = f'rm -f "{path}"'
                 uninstall_note = "Removes the local desktop shortcut"
                 data["primary_category"] = "Local Tools"
+                if os.path.exists(path):
+                    install_time = os.path.getmtime(path)
+                    install_date = format_timestamp(install_time)
 
         # Check System desktop file owned by system package manager
         elif path in file_to_pkg:
@@ -694,6 +881,8 @@ def scan_all_applications() -> Dict[str, Any]:
             package_version = pkg_info["version"]
             package_arch = pkg_info["arch"]
             installed_size = pkg_info.get("size", "")
+            install_time = pkg_info.get("install_time", 0.0)
+            install_date = pkg_info.get("install_date", "")
             uninstall_command = f"{uninstall_prefix} {package_name}"
             uninstall_note = f"Standard system package via {pkg_label}"
 
@@ -703,6 +892,20 @@ def scan_all_applications() -> Dict[str, Any]:
             package_name = fname.replace(".desktop", "")
             uninstall_command = f'sudo rm -f "{path}"'
             uninstall_note = "Manually created system desktop entry"
+            if os.path.exists(path):
+                install_time = os.path.getmtime(path)
+                install_date = format_timestamp(install_time)
+
+        if package_name and package_name in dnf_transitions:
+            trans = dnf_transitions[package_name]
+            version_transition = trans.get("version_transition", "")
+            update_action = trans.get("update_action", "")
+            if not package_version and trans.get("new_version"):
+                package_version = trans["new_version"]
+
+        is_recent_update = bool(install_time and install_time >= recent_cutoff)
+        if is_recent_update and not update_action:
+            update_action = "Updated"
 
         app_id = f"{scope}:{fname}"
         applications.append(
@@ -730,6 +933,11 @@ def scan_all_applications() -> Dict[str, Any]:
                 "uninstall_command": uninstall_command,
                 "uninstall_note": uninstall_note,
                 "is_override": is_override,
+                "install_time": install_time,
+                "install_date": install_date,
+                "version_transition": version_transition,
+                "update_action": update_action,
+                "is_recent_update": is_recent_update,
             }
         )
 
@@ -748,6 +956,8 @@ def scan_all_applications() -> Dict[str, Any]:
 
                 if os.access(app_path, os.X_OK):
                     sz = os.path.getsize(app_path)
+                    app_mtime = os.path.getmtime(app_path)
+                    is_recent = bool(app_mtime and app_mtime >= recent_cutoff)
                     applications.append(
                         {
                             "id": f"standalone:{item}",
@@ -773,6 +983,11 @@ def scan_all_applications() -> Dict[str, Any]:
                             "uninstall_command": f'rm -f "{app_path}"',
                             "uninstall_note": "Deletes the standalone application binary",
                             "is_override": False,
+                            "install_time": app_mtime,
+                            "install_date": format_timestamp(app_mtime),
+                            "version_transition": "",
+                            "update_action": "Updated" if is_recent else "",
+                            "is_recent_update": is_recent,
                         }
                     )
         except Exception:
@@ -796,6 +1011,7 @@ def scan_all_applications() -> Dict[str, Any]:
         "local_tool": sum(1 for a in applications if a["source_type"] == "local_tool"),
         "web_app": sum(1 for a in applications if a["source_type"] == "web_app"),
         "unmanaged": sum(1 for a in applications if a["source_type"] == "unmanaged"),
+        "recently_updated": sum(1 for a in applications if a.get("is_recent_update")),
         "distro": distro_info,
     }
 

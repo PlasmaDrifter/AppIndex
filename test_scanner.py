@@ -24,15 +24,29 @@ class TestScanner(unittest.TestCase):
         self.assertIn("distro", stats)
         self.assertGreater(stats["flatpak"], 0)
         self.assertGreater(stats["local_tool"], 0)
+        self.assertIn("recently_updated", stats)
+        self.assertIsInstance(stats["recently_updated"], int)
 
         # Check fields of applications
         sample = apps[0]
         required_fields = [
             "id", "name", "source_type", "source_label",
-            "in_menu", "package_name", "uninstall_command"
+            "in_menu", "package_name", "uninstall_command",
+            "install_date", "is_recent_update"
         ]
         for field in required_fields:
             self.assertIn(field, sample)
+
+    def test_timestamp_and_nevra_parsing(self):
+        from scanner import format_timestamp, parse_nevra
+        self.assertEqual(format_timestamp(None), "")
+        ts_str = format_timestamp(1700000000)
+        self.assertIsNotNone(ts_str)
+        self.assertTrue(ts_str.startswith("2023-"))
+
+        pkg_name, ver_rel = parse_nevra("firefox-128.0-1.fc40.x86_64")
+        self.assertEqual(pkg_name, "firefox")
+        self.assertEqual(ver_rel, "128.0-1.fc40")
 
     def test_distribution_info(self):
         from scanner import get_distribution_info
@@ -144,6 +158,19 @@ class TestAPI(unittest.TestCase):
             app_keys = set(data["applications"][0].keys())
             self.assertEqual(app_keys, {"name", "installed_size"})
 
+    def test_export_update_fields(self):
+        response = self.client.get("/api/export?format=csv&fields=name,package_name,install_date,version_transition")
+        self.assertEqual(response.status_code, 200)
+        first_line = response.text.splitlines()[0]
+        self.assertEqual(first_line.strip(), "name,package_name,install_date,version_transition")
+
+        json_resp = self.client.get("/api/export?format=json&fields=name,install_date,is_recent_update")
+        self.assertEqual(json_resp.status_code, 200)
+        data = json_resp.json()
+        if len(data.get("applications", [])) > 0:
+            app_keys = set(data["applications"][0].keys())
+            self.assertEqual(app_keys, {"name", "install_date", "is_recent_update"})
+
     def test_export_source_filter(self):
         response = self.client.get("/api/export?format=csv&sources=flatpak")
         self.assertEqual(response.status_code, 200)
@@ -180,7 +207,7 @@ class TestAPI(unittest.TestCase):
         from unittest.mock import patch
         with patch("server.apply_self_update") as mock_apply, \
              patch("server.trigger_server_restart") as mock_restart:
-            mock_apply.return_value = {"mode": "git", "message": "Updated via git pull", "tag": "v0.4.2"}
+            mock_apply.return_value = {"mode": "git", "message": "Updated via git pull", "tag": "v0.4.3"}
             response = self.client.post("/api/apply-update")
             self.assertEqual(response.status_code, 200)
             data = response.json()

@@ -64,7 +64,7 @@ AppIndex automatically detects your host distribution via `/etc/os-release` and 
 
 - **Freedesktop XDG Specification Compliance**: Fully implements directory precedence (`~/.local/share/applications` > `/var/lib/flatpak/exports` > `/usr/share/applications`) to deduplicate launchers and correctly identify user overrides.
 - **Dynamic Desktop Environment Detection**: Evaluates `OnlyShowIn` and `NotShowIn` against `$XDG_CURRENT_DESKTOP` to accurately reflect app menu visibility on KDE Plasma, GNOME, XFCE, Cinnamon, MATE, and window managers.
-- **Copyable Commands**: One-click clipboard copy for exact package identifiers and root uninstall commands.
+- **Recent Update & Version Transition Tracking**: Automatically tracks software installed or upgraded within the last 48 hours across RPM/DNF transactions, Flatpak deployments, AppImages, and Steam libraries, detailing version transitions (e.g. `old -> new`) and relative update times.
 - **Dual Presentation**: Toggle between a dense, sorting-capable Data Table and a responsive Card Grid.
 - **Helper & Daemon Filtering**: Toolbar toggle to show or hide background daemons, system services, and utilities marked `NoDisplay=true`.
 - **Real-Time Search & Category Filters**: Multi-field search by name, package ID, binary path, comment, or desktop file with instant filtering.
@@ -74,7 +74,7 @@ AppIndex automatically detects your host distribution via `/etc/os-release` and 
   - View Density Controls: Compact, Standard, and Spacious layout spacing.
   - Font Scaling: Interactive font slider from 80% to 130%.
   - Zero-FOUC persistence in browser local storage.
-- **Export Formats**: Download complete inventory reports in CSV or JSON formats.
+- **Export Formats**: Download complete inventory reports in CSV or JSON formats with custom field, package source, and visibility selectors.
 
 ---
 
@@ -218,10 +218,13 @@ systemctl --user enable --now appindex.service
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
 | `/api/apps` | `GET` | Returns list of all scanned applications, package metadata, and summary stats |
-| `/api/icon?name=<icon_name>` | `GET` | Resolves and serves application icons via XDG theme lookup |
-| `/api/desktop-content?path=<path>` | `GET` | Returns raw text content of a local `.desktop` file |
-| `/api/refresh` | `POST` | Invalidates in-memory cache and triggers a full system rescan |
-| `/api/export?format=csv\|json&fields=...&sources=...&visibility=...` | `GET` | Downloads catalog as a CSV or JSON file with optional column, package source, and visibility filters |
+| `/api/status` | `GET` | Health check and current application version endpoint |
+| `/api/icon?name=<name>&path=<path>` | `GET`, `HEAD` | Resolves and serves application icons with 24-hour browser caching |
+| `/api/desktop-content?path=<path>` | `GET` | Returns raw text content of an authorized local `.desktop` file |
+| `/api/refresh` | `POST` | Invalidates in-memory caches and triggers an immediate full system rescan |
+| `/api/export?format=csv\|json&...` | `GET` | Downloads catalog as CSV or JSON with optional field, source, and visibility filters |
+| `/api/check-update?force=1` | `GET` | Queries GitHub API for the latest release tag |
+| `/api/apply-update` | `POST` | Initiates automatic in-place update via git or release tarball and restarts the server |
 | `/favicon.ico` | `GET`, `HEAD` | Serves application favicon |
 
 ---

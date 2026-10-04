@@ -10,6 +10,7 @@ let currentSort = "name_asc";
 let currentSearchTerm = "";
 let currentViewMode = "table"; // "cards" or "table"
 let appUpdateData = null;
+let currentRenderedApps = [];
 
 // DOM Elements
 const loadingSpinner = document.getElementById("loading-spinner");
@@ -26,7 +27,6 @@ const viewTableBtn = document.getElementById("view-table-btn");
 const toggleHidden = document.getElementById("toggle-hidden");
 const btnRefresh = document.getElementById("btn-refresh");
 const btnExport = document.getElementById("btn-export");
-const exportMenu = document.getElementById("export-menu");
 const toast = document.getElementById("toast");
 
 // Modal Elements
@@ -38,6 +38,9 @@ const modalAppGeneric = document.getElementById("modal-app-generic");
 const modalSourceLabel = document.getElementById("modal-source-label");
 const modalPackageName = document.getElementById("modal-package-name");
 const modalVersionArch = document.getElementById("modal-version-arch");
+const modalTransitionRow = document.getElementById("modal-transition-row");
+const modalVersionTransition = document.getElementById("modal-version-transition");
+const modalLastUpdated = document.getElementById("modal-last-updated");
 const modalSize = document.getElementById("modal-size");
 const modalMenuStatus = document.getElementById("modal-menu-status");
 const modalCategory = document.getElementById("modal-category");
@@ -259,6 +262,9 @@ let activeModalApp = null;
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
   try {
+    localStorage.removeItem("appindex_column_widths_v1");
+  } catch (e) {}
+  try {
     initSettingsUI();
   } catch (err) {
     console.error("Error initializing settings UI:", err);
@@ -346,15 +352,55 @@ function setupEventListeners() {
     });
   });
 
-  // Stat pills and cards clicking
-  document.querySelectorAll(".stat-pill, .stat-card").forEach((card) => {
-    card.addEventListener("click", () => {
-      const filter = card.dataset.filter;
-      const targetTab = document.querySelector(`.tab-btn[data-source="${filter}"]`);
-      if (targetTab) {
-        targetTab.click();
-      }
-    });
+  // Delegated table actions (inspect, copy)
+  appsTableBody.addEventListener("click", (e) => {
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    const idx = parseInt(tr.dataset.index, 10);
+    const app = currentRenderedApps[idx];
+    if (!app) return;
+
+    const copyBtn = e.target.closest(".btn-table-copy");
+    if (copyBtn) {
+      e.stopPropagation();
+      copyToClipboard(app.uninstall_command, "Uninstall command copied", copyBtn);
+      return;
+    }
+
+    const inspectBtn = e.target.closest(".btn-table-inspect");
+    if (inspectBtn) {
+      openModal(app);
+      return;
+    }
+  });
+
+  // Delegated card actions (inspect, copy pkg, copy cmd)
+  appsGrid.addEventListener("click", (e) => {
+    const card = e.target.closest(".app-card");
+    if (!card) return;
+    const idx = parseInt(card.dataset.index, 10);
+    const app = currentRenderedApps[idx];
+    if (!app) return;
+
+    const copyPkgBtn = e.target.closest(".btn-copy-pkg");
+    if (copyPkgBtn) {
+      e.stopPropagation();
+      copyToClipboard(app.package_name, "Package name copied: " + app.package_name, copyPkgBtn);
+      return;
+    }
+
+    const copyCmdBtn = e.target.closest(".btn-copy-cmd");
+    if (copyCmdBtn) {
+      e.stopPropagation();
+      copyToClipboard(app.uninstall_command, "Uninstall command copied", copyCmdBtn);
+      return;
+    }
+
+    const inspectBtn = e.target.closest(".btn-inspect");
+    if (inspectBtn) {
+      openModal(app);
+      return;
+    }
   });
 
   // Refresh button
@@ -366,6 +412,7 @@ function setupEventListeners() {
       const data = await res.json();
       allApps = data.applications || [];
       appStats = data.stats || {};
+      prepareAppsData(allApps);
       updateStatsUI();
       renderApplications();
       showToast("Rescan complete: " + allApps.length + " applications found");
@@ -380,22 +427,11 @@ function setupEventListeners() {
   const exportModalElem = document.getElementById("export-modal");
   const exportCloseElem = document.getElementById("export-close-btn");
   const exportCancelElem = document.getElementById("export-cancel-btn");
-  const btnOpenExportModal = document.getElementById("btn-open-export-modal");
   const btnDoExport = document.getElementById("btn-do-export");
 
   if (btnExport) {
     btnExport.addEventListener("click", (e) => {
       e.stopPropagation();
-      openExportModal();
-    });
-  }
-
-  if (btnOpenExportModal) {
-    btnOpenExportModal.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (btnExport && btnExport.parentElement) {
-        btnExport.parentElement.classList.remove("open");
-      }
       openExportModal();
     });
   }
@@ -509,10 +545,6 @@ function setupEventListeners() {
     input.addEventListener("change", updateExportSummary);
   });
 
-  document.addEventListener("click", () => {
-    document.querySelectorAll(".dropdown").forEach((d) => d.classList.remove("open"));
-  });
-
   // Reset filters button
   document.getElementById("btn-reset-filters").addEventListener("click", () => {
     searchInput.value = "";
@@ -614,6 +646,22 @@ function setupEventListeners() {
   });
 }
 
+function prepareAppsData(apps) {
+  apps.forEach((app) => {
+    app._searchIndex = [
+      app.name,
+      app.generic_name,
+      app.comment,
+      app.package_name,
+      app.exec_command,
+      app.desktop_filename
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+  });
+}
+
 // Fetch applications data
 async function loadApplications() {
   loadingSpinner.style.display = "flex";
@@ -625,7 +673,15 @@ async function loadApplications() {
     const data = await res.json();
     allApps = data.applications || [];
     appStats = data.stats || {};
+    prepareAppsData(allApps);
     updateStatsUI();
+    const urlParams = new URLSearchParams(window.location.search);
+    const qParam = urlParams.get("q");
+    if (qParam && !currentSearchTerm) {
+      searchInput.value = qParam;
+      currentSearchTerm = qParam.toLowerCase().trim();
+      clearSearchBtn.style.display = "flex";
+    }
     renderApplications();
   } catch (err) {
     showToast("Error loading application catalog");
@@ -634,10 +690,30 @@ async function loadApplications() {
   }
 }
 
+function formatRelativeTime(epoch) {
+  if (!epoch) return "";
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - epoch;
+  if (diff < 0) return "just now";
+  if (diff < 60) return `${diff}s ago`;
+  const mins = Math.floor(diff / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}
+
 // Update counters in tabs
 function updateStatsUI() {
   const countAll = document.getElementById("count-all");
   if (countAll) countAll.textContent = appStats.total ?? allApps.length;
+  const countRecent = document.getElementById("count-recent");
+  if (countRecent) countRecent.textContent = appStats.recently_updated ?? 0;
   const countMenu = document.getElementById("count-menu");
   if (countMenu) countMenu.textContent = appStats.in_menu ?? 0;
   const countLocal = document.getElementById("count-local");
@@ -666,7 +742,10 @@ function getFilteredApps() {
 
   return allApps.filter((app) => {
     // Source / Menu Filter
-    if (currentSourceFilter === "hidden") {
+    if (currentSourceFilter === "recently_updated") {
+      if (!app.is_recent_update) return false;
+      if (!showHidden && !app.in_menu) return false;
+    } else if (currentSourceFilter === "hidden") {
       if (app.in_menu) return false;
     } else if (currentSourceFilter === "in_menu") {
       if (!app.in_menu) return false;
@@ -693,14 +772,9 @@ function getFilteredApps() {
 
     // Text Search Filter
     if (currentSearchTerm) {
-      const match =
-        (app.name && app.name.toLowerCase().includes(currentSearchTerm)) ||
-        (app.generic_name && app.generic_name.toLowerCase().includes(currentSearchTerm)) ||
-        (app.comment && app.comment.toLowerCase().includes(currentSearchTerm)) ||
-        (app.package_name && app.package_name.toLowerCase().includes(currentSearchTerm)) ||
-        (app.exec_command && app.exec_command.toLowerCase().includes(currentSearchTerm)) ||
-        (app.desktop_filename && app.desktop_filename.toLowerCase().includes(currentSearchTerm));
-      if (!match) return false;
+      if (!app._searchIndex || !app._searchIndex.includes(currentSearchTerm)) {
+        return false;
+      }
     }
 
     return true;
@@ -713,6 +787,10 @@ function getFilteredApps() {
       return a.source_label.localeCompare(b.source_label);
     } else if (currentSort === "pkg") {
       return (a.package_name || "").localeCompare(b.package_name || "");
+    } else if (currentSort === "updated_desc") {
+      return (b.install_time || 0) - (a.install_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "updated_asc") {
+      return (a.install_time || 0) - (b.install_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     }
     return 0;
   });
@@ -721,6 +799,7 @@ function getFilteredApps() {
 // Render the application list
 function renderApplications() {
   const filtered = getFilteredApps();
+  currentRenderedApps = filtered;
 
   if (filtered.length === 0) {
     emptyState.style.display = "flex";
@@ -747,9 +826,10 @@ function renderCards(apps) {
   appsGrid.innerHTML = "";
   const fragment = document.createDocumentFragment();
 
-  apps.forEach((app) => {
+  apps.forEach((app, idx) => {
     const card = document.createElement("div");
-    card.className = "app-card";
+    card.className = "app-card" + (app.is_recent_update ? " card-recently-updated" : "");
+    card.dataset.index = idx;
 
     const iconUrl = app.icon
       ? `/api/icon?name=${encodeURIComponent(app.icon)}`
@@ -773,12 +853,14 @@ function renderCards(apps) {
           <div class="card-header-info">
             <div class="card-title-row">
               <h3 class="app-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</h3>
+              ${app.package_version ? `<span class="badge badge-version${app.is_recent_update ? ' recent-version' : ''}" title="Version ${escapeHtml(app.package_version)}">v${escapeHtml(app.package_version)}</span>` : ""}
             </div>
             <div class="app-subtitle" title="${escapeHtml(subtitle || app.name)}">${escapeHtml(subtitle || "")}</div>
             <div class="card-badges">
               <span class="badge ${badgeClass}">${escapeHtml(app.source_label)}</span>
               <span class="badge ${menuBadgeClass}">${menuBadgeText}</span>
               ${app.primary_category ? `<span class="badge badge-unmanaged">${escapeHtml(app.primary_category)}</span>` : ""}
+              ${app.is_recent_update ? `<span class="badge badge-recent-update" title="Updated within last 48 hours">Recently Updated</span>` : ""}
             </div>
           </div>
         </div>
@@ -810,33 +892,19 @@ function renderCards(apps) {
         ` : ""}
 
         <div class="card-footer">
-          <span class="meta-size-ver">${escapeHtml(versionSizeStr)}</span>
+          <div class="card-footer-left">
+            <span class="meta-size-ver">${escapeHtml(versionSizeStr)}</span>
+            ${app.install_date ? `
+              <div class="card-update-meta">
+                <span class="card-update-time" title="Installed / Updated: ${escapeHtml(app.install_date)}">Updated: ${escapeHtml(app.install_date)}${app.install_time ? ` (${formatRelativeTime(app.install_time)})` : ""}</span>
+                ${app.version_transition ? `<span class="card-transition-text" title="${escapeHtml(app.version_transition)}">${escapeHtml(app.version_transition)}</span>` : ""}
+              </div>
+            ` : ""}
+          </div>
           <button class="btn btn-outline btn-sm btn-inspect">Inspect</button>
         </div>
       </div>
     `;
-
-    // Event listeners on card buttons
-    const btnCopyPkg = card.querySelector(".btn-copy-pkg");
-    if (btnCopyPkg) {
-      btnCopyPkg.addEventListener("click", (e) => {
-        e.stopPropagation();
-        copyToClipboard(app.package_name, "Package name copied: " + app.package_name, btnCopyPkg);
-      });
-    }
-
-    const btnCopyCmd = card.querySelector(".btn-copy-cmd");
-    if (btnCopyCmd) {
-      btnCopyCmd.addEventListener("click", (e) => {
-        e.stopPropagation();
-        copyToClipboard(app.uninstall_command, "Uninstall command copied", btnCopyCmd);
-      });
-    }
-
-    const btnInspect = card.querySelector(".btn-inspect");
-    if (btnInspect) {
-      btnInspect.addEventListener("click", () => openModal(app));
-    }
 
     fragment.appendChild(card);
   });
@@ -849,8 +917,12 @@ function renderTable(apps) {
   appsTableBody.innerHTML = "";
   const fragment = document.createDocumentFragment();
 
-  apps.forEach((app) => {
+  apps.forEach((app, idx) => {
     const tr = document.createElement("tr");
+    if (app.is_recent_update) {
+      tr.className = "table-row-recent";
+    }
+    tr.dataset.index = idx;
 
     const iconUrl = app.icon
       ? `/api/icon?name=${encodeURIComponent(app.icon)}`
@@ -858,33 +930,50 @@ function renderTable(apps) {
 
     const badgeClass = `badge-source-${app.source_type}`;
 
+    let updatedCellHtml = `<span style="color: var(--text-muted);">-</span>`;
+    if (app.install_date) {
+      const relTime = app.install_time ? formatRelativeTime(app.install_time) : "";
+      const updateTitle = [
+        `Installed / Updated: ${app.install_date}`,
+        app.version_transition ? `Transition: ${app.version_transition}` : "",
+        app.update_action ? `Action: ${app.update_action}` : ""
+      ].filter(Boolean).join(" • ");
+
+      const datePart = app.install_date.split(" ")[0];
+
+      updatedCellHtml = `
+        <div class="table-updated-cell" title="${escapeHtml(updateTitle)}">
+          <div class="table-update-date">${escapeHtml(datePart)}</div>
+          <div class="table-update-rel${app.is_recent_update ? ' recent' : ''}">${escapeHtml(relTime || "")}</div>
+        </div>
+      `;
+    }
+
+    const versionHtml = app.package_version
+      ? `<code class="table-version-code${app.is_recent_update ? ' recent-version' : ''}" title="${escapeHtml(app.package_version)}">${escapeHtml(app.package_version)}</code>`
+      : `<span style="color: var(--text-muted);">-</span>`;
+
     tr.innerHTML = `
-      <td>
+      <td class="col-icon">
         <img class="table-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.src='/api/icon'">
       </td>
-      <td>
-        <strong class="table-app-name">${escapeHtml(app.name)}</strong>
-        ${app.generic_name ? `<div class="table-app-generic">${escapeHtml(app.generic_name)}</div>` : ""}
+      <td class="col-app-name">
+        <div class="table-app-title-row">
+          <strong class="table-app-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</strong>
+          ${app.is_recent_update ? `<span class="badge badge-recent-update" style="font-size: 9px; padding: 1px 5px; flex-shrink: 0;" title="Updated within last 48 hours">Recent</span>` : ""}
+        </div>
+        <div class="table-app-generic" title="${escapeHtml(app.generic_name || app.comment || "")}">${escapeHtml(app.generic_name || app.comment || "")}</div>
+      </td>
+      <td class="col-last-updated">
+        ${updatedCellHtml}
+      </td>
+      <td class="col-version">
+        ${versionHtml}
       </td>
       <td class="col-install-type">
         <span class="badge ${badgeClass}">${escapeHtml(app.source_label)}</span>
       </td>
-      <td>
-        <div class="table-pkg-cell">
-          <code class="table-pkg-code" title="${escapeHtml(app.package_name || "")}">
-            ${escapeHtml(app.package_name || "N/A")}
-          </code>
-          ${app.package_name ? `
-            <button class="copy-icon-btn btn-table-copy-pkg" title="Copy package name">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-          ` : ""}
-        </div>
-      </td>
-      <td>
+      <td class="col-uninstall-cmd">
         ${app.uninstall_command ? `
           <div class="table-cmd-cell">
             <code class="table-cmd-code" title="${escapeHtml(app.uninstall_command)}">${escapeHtml(app.uninstall_command)}</code>
@@ -897,31 +986,10 @@ function renderTable(apps) {
           ${app.in_menu ? "In Menu" : "Hidden"}
         </span>
       </td>
-      <td>
+      <td class="col-action">
         <button class="btn btn-outline btn-sm btn-table-inspect">Inspect</button>
       </td>
     `;
-
-    const btnTableCopyPkg = tr.querySelector(".btn-table-copy-pkg");
-    if (btnTableCopyPkg) {
-      btnTableCopyPkg.addEventListener("click", (e) => {
-        e.stopPropagation();
-        copyToClipboard(app.package_name, "Package name copied: " + app.package_name, btnTableCopyPkg);
-      });
-    }
-
-    const btnTableCopy = tr.querySelector(".btn-table-copy");
-    if (btnTableCopy) {
-      btnTableCopy.addEventListener("click", (e) => {
-        e.stopPropagation();
-        copyToClipboard(app.uninstall_command, "Uninstall command copied", btnTableCopy);
-      });
-    }
-
-    const btnTableInspect = tr.querySelector(".btn-table-inspect");
-    if (btnTableInspect) {
-      btnTableInspect.addEventListener("click", () => openModal(app));
-    }
 
     fragment.appendChild(tr);
   });
@@ -943,6 +1011,28 @@ function openModal(app) {
   modalSourceLabel.textContent = app.source_label;
   modalPackageName.textContent = app.package_name || "N/A";
   modalVersionArch.textContent = [app.package_version, app.package_arch].filter(Boolean).join(" / ") || "N/A";
+  if (modalLastUpdated) {
+    let updateText = app.install_date || "Unknown";
+    if (app.install_time) {
+      const relTime = formatRelativeTime(app.install_time);
+      if (relTime) {
+        updateText += ` (${relTime})`;
+      }
+    }
+    if (app.is_recent_update) {
+      updateText += " — Updated within last 48h";
+    }
+    modalLastUpdated.textContent = updateText;
+  }
+  if (modalTransitionRow && modalVersionTransition) {
+    if (app.version_transition) {
+      modalTransitionRow.style.display = "flex";
+      modalVersionTransition.textContent = app.version_transition + (app.update_action ? ` [${app.update_action}]` : "");
+    } else {
+      modalTransitionRow.style.display = "none";
+      modalVersionTransition.textContent = "";
+    }
+  }
   modalSize.textContent = app.installed_size || "Unknown";
   modalMenuStatus.textContent = app.in_menu ? "Visible in Application Menu" : "Hidden / Helper Application";
   modalCategory.textContent = app.primary_category + (app.categories && app.categories.length ? ` (${app.categories.join(", ")})` : "");

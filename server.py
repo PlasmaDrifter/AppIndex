@@ -17,10 +17,10 @@ import tarfile
 import tempfile
 import threading
 import time
-from typing import Optional, List, Set, Tuple
+from typing import Optional, List, Set, Tuple, Dict
 import urllib.request
 from fastapi import FastAPI, Query, HTTPException, Response, Request
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import xdg.IconTheme
@@ -31,7 +31,7 @@ except ImportError:
 
 from scanner import scan_all_applications
 
-APP_VERSION = "0.4.2"
+APP_VERSION = "0.4.3"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -50,8 +50,12 @@ async def add_static_no_cache_headers(request: Request, call_next):
     return response
 
 
-# In-memory cache
+# In-memory caches
 _CACHED_DATA = None
+_CACHED_ALLOWED_ICON_DIRS: Optional[Tuple[str, ...]] = None
+_CACHED_ALLOWED_DESKTOP_DIRS: Optional[Tuple[str, ...]] = None
+_RESOLVED_ICON_CACHE: Dict[str, Optional[str]] = {}
+_XPM_CACHE: Dict[str, bytes] = {}
 
 
 def parse_version_tuple(ver_str: str):
@@ -160,7 +164,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.4.2"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.4.3"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -255,9 +259,12 @@ def trigger_server_restart():
 
 
 def get_cached_or_scan(force_refresh: bool = False):
-    global _CACHED_DATA
+    global _CACHED_DATA, _CACHED_ALLOWED_ICON_DIRS, _RESOLVED_ICON_CACHE, _XPM_CACHE
     if _CACHED_DATA is None or force_refresh:
         _CACHED_DATA = scan_all_applications()
+        _CACHED_ALLOWED_ICON_DIRS = None
+        _RESOLVED_ICON_CACHE.clear()
+        _XPM_CACHE.clear()
     return _CACHED_DATA
 
 
@@ -265,6 +272,9 @@ ALLOWED_IMAGE_EXTENSIONS: Tuple[str, ...] = (".png", ".svg", ".xpm", ".ico", ".w
 
 
 def get_allowed_desktop_dirs() -> Tuple[str, ...]:
+    global _CACHED_ALLOWED_DESKTOP_DIRS
+    if _CACHED_ALLOWED_DESKTOP_DIRS is not None:
+        return _CACHED_ALLOWED_DESKTOP_DIRS
     candidate_dirs = [
         "/usr/share/applications",
         "/usr/local/share/applications",
@@ -278,10 +288,14 @@ def get_allowed_desktop_dirs() -> Tuple[str, ...]:
         if not r.endswith(os.sep):
             r += os.sep
         resolved.append(r)
-    return tuple(resolved)
+    _CACHED_ALLOWED_DESKTOP_DIRS = tuple(resolved)
+    return _CACHED_ALLOWED_DESKTOP_DIRS
 
 
 def get_allowed_icon_dirs() -> Tuple[str, ...]:
+    global _CACHED_ALLOWED_ICON_DIRS
+    if _CACHED_ALLOWED_ICON_DIRS is not None:
+        return _CACHED_ALLOWED_ICON_DIRS
     candidate_dirs = [
         "/usr/share/icons",
         "/usr/share/pixmaps",
@@ -306,7 +320,8 @@ def get_allowed_icon_dirs() -> Tuple[str, ...]:
             d += os.sep
         if d not in resolved:
             resolved.append(d)
-    return tuple(resolved)
+    _CACHED_ALLOWED_ICON_DIRS = tuple(resolved)
+    return _CACHED_ALLOWED_ICON_DIRS
 
 
 def get_known_scanned_icon_paths() -> Set[str]:
@@ -363,6 +378,15 @@ def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
     if not icon_name_or_path:
         return None
 
+    if icon_name_or_path in _RESOLVED_ICON_CACHE:
+        return _RESOLVED_ICON_CACHE[icon_name_or_path]
+
+    resolved = _resolve_icon_path_uncached(icon_name_or_path)
+    _RESOLVED_ICON_CACHE[icon_name_or_path] = resolved
+    return resolved
+
+
+def _resolve_icon_path_uncached(icon_name_or_path: str) -> Optional[str]:
     # Strip potential file:// scheme
     if icon_name_or_path.startswith("file://"):
         icon_name_or_path = icon_name_or_path[7:]
@@ -441,6 +465,9 @@ def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
     if not canonical.endswith(".xpm"):
         return None
 
+    if canonical in _XPM_CACHE:
+        return _XPM_CACHE[canonical]
+
     allowed_dirs = get_allowed_icon_dirs()
     if canonical.startswith(allowed_dirs):
         if os.path.isfile(canonical):
@@ -449,7 +476,9 @@ def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
                 im = Image.open(canonical)
                 buf = io.BytesIO()
                 im.save(buf, format="PNG")
-                return buf.getvalue()
+                png_bytes = buf.getvalue()
+                _XPM_CACHE[canonical] = png_bytes
+                return png_bytes
             except Exception:
                 pass
 
@@ -504,12 +533,16 @@ def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
 
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
-                return buf.getvalue()
+                png_bytes = buf.getvalue()
+                _XPM_CACHE[canonical] = png_bytes
+                return png_bytes
             except Exception:
                 return None
 
     return None
 
+
+ICON_CACHE_HEADERS = {"Cache-Control": "public, max-age=86400"}
 
 # Default fallback SVG icon
 FALLBACK_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#8892b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -556,12 +589,12 @@ async def refresh_apps():
     return get_cached_or_scan(force_refresh=True)
 
 
-@app.get("/api/icon")
+@app.api_route("/api/icon", methods=["GET", "HEAD"])
 async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Query(None)):
     """Serve application icon by name or absolute path."""
     target = path or name
     if not target:
-        return Response(content=FALLBACK_SVG, media_type="image/svg+xml")
+        return Response(content=FALLBACK_SVG, media_type="image/svg+xml", headers=ICON_CACHE_HEADERS)
 
     # Security check: resolve icon path strictly within allowed icon roots
     resolved = resolve_icon_path(target)
@@ -575,7 +608,7 @@ async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Quer
                     if canonical.endswith(".xpm"):
                         png_bytes = convert_xpm_to_png(canonical)
                         if png_bytes:
-                            return Response(content=png_bytes, media_type="image/png")
+                            return Response(content=png_bytes, media_type="image/png", headers=ICON_CACHE_HEADERS)
 
                     mime, _ = mimetypes.guess_type(canonical)
                     if not mime:
@@ -587,9 +620,9 @@ async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Quer
                             mime = "image/x-xpixmap"
                         else:
                             mime = "application/octet-stream"
-                    return FileResponse(canonical, media_type=mime)
+                    return FileResponse(canonical, media_type=mime, headers=ICON_CACHE_HEADERS)
 
-    return Response(content=FALLBACK_SVG, media_type="image/svg+xml")
+    return Response(content=FALLBACK_SVG, media_type="image/svg+xml", headers=ICON_CACHE_HEADERS)
 
 
 @app.get("/api/desktop-content")
