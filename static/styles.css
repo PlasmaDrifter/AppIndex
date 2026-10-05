@@ -24,29 +24,29 @@
   --accent-red: #ed8796;
   --accent-purple: #c6a0f6;
   
-  --badge-rpm-bg: rgba(138, 173, 244, 0.15);
-  --badge-rpm-border: rgba(138, 173, 244, 0.4);
   --badge-rpm-text: #8aadf4;
-  
-  --badge-flatpak-bg: rgba(238, 153, 160, 0.15);
-  --badge-flatpak-border: rgba(238, 153, 160, 0.4);
+  --badge-rpm-bg: color-mix(in srgb, var(--badge-rpm-text, #8aadf4) 15%, transparent);
+  --badge-rpm-border: color-mix(in srgb, var(--badge-rpm-text, #8aadf4) 40%, transparent);
+
   --badge-flatpak-text: #ee99a0;
+  --badge-flatpak-bg: color-mix(in srgb, var(--badge-flatpak-text, #ee99a0) 15%, transparent);
+  --badge-flatpak-border: color-mix(in srgb, var(--badge-flatpak-text, #ee99a0) 40%, transparent);
 
-  --badge-local-bg: rgba(238, 212, 159, 0.15);
-  --badge-local-border: rgba(238, 212, 159, 0.4);
   --badge-local-text: #eed49f;
+  --badge-local-bg: color-mix(in srgb, var(--badge-local-text, #eed49f) 15%, transparent);
+  --badge-local-border: color-mix(in srgb, var(--badge-local-text, #eed49f) 40%, transparent);
 
-  --badge-appimage-bg: rgba(245, 169, 127, 0.15);
-  --badge-appimage-border: rgba(245, 169, 127, 0.4);
   --badge-appimage-text: #f5a97f;
+  --badge-appimage-bg: color-mix(in srgb, var(--badge-appimage-text, #f5a97f) 15%, transparent);
+  --badge-appimage-border: color-mix(in srgb, var(--badge-appimage-text, #f5a97f) 40%, transparent);
 
-  --badge-steam-bg: rgba(198, 160, 246, 0.15);
-  --badge-steam-border: rgba(198, 160, 246, 0.4);
   --badge-steam-text: #c6a0f6;
+  --badge-steam-bg: color-mix(in srgb, var(--badge-steam-text, #c6a0f6) 15%, transparent);
+  --badge-steam-border: color-mix(in srgb, var(--badge-steam-text, #c6a0f6) 40%, transparent);
 
-  --badge-unmanaged-bg: rgba(128, 135, 162, 0.2);
-  --badge-unmanaged-border: rgba(128, 135, 162, 0.4);
   --badge-unmanaged-text: #b8c0e0;
+  --badge-unmanaged-bg: color-mix(in srgb, var(--badge-unmanaged-text, #b8c0e0) 18%, transparent);
+  --badge-unmanaged-border: color-mix(in srgb, var(--badge-unmanaged-text, #b8c0e0) 40%, transparent);
 
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
@@ -277,6 +277,12 @@ body {
   height: 27px;
   padding: 0 !important;
   flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.nav-github-btn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-focus);
 }
 
 .nav-github-icon {
@@ -288,7 +294,7 @@ body {
 
 .nav-github-btn:hover .nav-github-icon {
   color: var(--text-primary);
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .nav-update-badge {
@@ -324,6 +330,12 @@ body {
 
 .nav-settings-btn {
   position: relative;
+}
+
+.nav-settings-btn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-focus);
+  color: var(--text-primary);
 }
 
 /* Settings Update Banner */
@@ -526,10 +538,27 @@ body {
   flex-shrink: 0;
 }
 
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
 .search-box {
   position: relative;
-  flex: 1;
-  min-width: 240px;
+  width: 250px;
+  min-width: 180px;
+  flex: 0 1 250px;
 }
 
 .search-icon {
@@ -613,16 +642,49 @@ body {
 }
 
 #category-filter {
-  min-width: 155px;
+  min-width: 135px;
 }
 
 #sort-by {
-  min-width: 135px;
+  min-width: 125px;
 }
 
 .toggle-wrapper {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.btn-pin-toggle {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-pin-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background-color: var(--bg-card-hover, var(--bg-card));
+}
+
+.btn-pin-toggle.active {
+  background-color: var(--bg-card);
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.btn-pin-toggle.active svg path {
+  fill: currentColor;
 }
 
 .toggle-label {
@@ -726,12 +788,39 @@ body {
   min-width: 0;
   flex: 1;
   scrollbar-width: thin;
+  position: relative;
+  padding: 4px 0;
+}
+
+/* Sliding Active Pill Indicator */
+.tab-sliding-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--accent-blue) 22%, var(--bg-card));
+  border: 1px solid var(--accent-blue);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-blue) 22%, transparent);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  box-sizing: border-box;
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1),
+              width 0.28s cubic-bezier(0.2, 0.9, 0.3, 1),
+              height 0.28s cubic-bezier(0.2, 0.9, 0.3, 1),
+              opacity 0.18s ease;
+  will-change: transform, width, height;
 }
 
 .tab-btn {
-  background-color: var(--bg-card);
+  position: relative;
+  z-index: 2;
+  background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  color: var(--text-muted);
   padding: 7px 16px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -740,6 +829,7 @@ body {
   font-weight: 500;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   appearance: none;
   -webkit-appearance: none;
@@ -748,34 +838,64 @@ body {
 }
 
 .tab-btn:hover {
-  background-color: var(--bg-card-hover);
-  border-color: var(--border-focus);
+  background-color: var(--bg-card);
+  border-color: rgba(255, 255, 255, 0.18);
   color: var(--text-primary);
 }
 
 .tab-btn.active {
-  background-color: var(--accent-blue);
-  color: var(--btn-primary-text, #181926);
+  background-color: color-mix(in srgb, var(--accent-blue) 22%, var(--bg-card));
+  color: var(--accent-blue);
   border-color: var(--accent-blue);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-blue) 22%, transparent);
   font-weight: 500;
 }
 
-/* Export Button: Same aesthetics as other tab-btns, subtle yellow tint, anchored right */
+.filter-tabs-scroll.has-pill .tab-btn {
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.filter-tabs-scroll.has-pill .tab-btn.active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--accent-blue);
+}
+
+.filter-tabs-scroll.has-pill .tab-btn.active:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent-blue);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-sliding-pill {
+    transition: none !important;
+  }
+}
+
+/* Export Button: subtle yellow tint */
+.btn.btn-export,
+.btn-export,
 .tab-btn.tab-btn-export {
-  margin-left: auto;
-  flex-shrink: 0;
-  background-color: rgba(238, 212, 159, 0.08);
-  border: 1px solid rgba(238, 212, 159, 0.35);
+  background-color: color-mix(in srgb, var(--accent-yellow, #eed49f) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-yellow, #eed49f) 35%, transparent);
   color: var(--accent-yellow, #eed49f);
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
+.btn.btn-export:hover,
+.btn-export:hover,
 .tab-btn.tab-btn-export:hover {
-  background-color: rgba(238, 212, 159, 0.18);
-  border-color: rgba(238, 212, 159, 0.65);
+  background-color: color-mix(in srgb, var(--accent-yellow, #eed49f) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent-yellow, #eed49f) 65%, transparent);
   color: var(--accent-yellow, #eed49f);
-  box-shadow: 0 0 10px rgba(238, 212, 159, 0.25);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-yellow, #eed49f) 25%, transparent);
 }
 
+.btn.btn-export:active,
+.btn-export:active,
 .tab-btn.tab-btn-export:active {
   transform: translateY(1px);
 }
@@ -1138,7 +1258,7 @@ body {
 .uninstall-code {
   font-family: var(--font-mono);
   font-size: 10.5px;
-  color: var(--accent-orange);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1560,7 +1680,7 @@ body {
 .table-cmd-code {
   font-family: var(--font-mono);
   font-size: calc(13px * var(--font-scale, 1));
-  color: var(--accent-orange);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1812,7 +1932,7 @@ body {
 
 .command-box code {
   font-family: var(--font-mono);
-  color: var(--accent-orange);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -1969,7 +2089,7 @@ body.density-spacious .app-icon {
 }
 
 .settings-modal-content {
-  max-width: 720px;
+  max-width: 760px;
   max-height: calc(100vh - 24px);
   display: flex;
   flex-direction: column;
@@ -2196,19 +2316,58 @@ body.density-spacious .app-icon {
   text-overflow: ellipsis;
 }
 
-/* Color Pickers Grid */
+/* Color Pickers Dual-Column Layout */
+.theme-builder-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.theme-builder-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.color-picker-category {
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px 10px;
+  margin-bottom: 0;
+}
+
+.color-picker-category-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .color-pickers-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: 6px;
-  margin-bottom: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .color-picker-item {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+}
+
+.color-picker-item.span-2col {
+  grid-column: 1 / -1;
 }
 
 .color-picker-item label {
@@ -2768,9 +2927,15 @@ body.density-spacious .app-icon {
   .stats-container { padding: 16px 16px 8px; grid-template-columns: repeat(2, 1fr); }
   .main-content { padding: 8px 16px 12px; }
   .apps-grid { grid-template-columns: 1fr; }
-  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar { flex-direction: column; align-items: stretch; gap: 12px; }
+  .toolbar-left,
+  .toolbar-right { width: 100%; margin-left: 0; }
+  .toolbar-left { flex-wrap: wrap; }
+  .toolbar-right { justify-content: space-between; }
+  .search-box { width: 100%; flex: 1 1 100%; }
   .info-row { flex-direction: column; gap: 4px; }
   .info-label { width: auto; }
   .density-selector { grid-template-columns: 1fr; }
+  .theme-builder-columns { grid-template-columns: 1fr; }
 }
 

@@ -26,7 +26,7 @@
         </div>
         <div class="brand-text">
           <h1>AppIndex</h1>
-          <span class="brand-version" id="brand-app-version">v0.4.7</span>
+          <span class="brand-version" id="brand-app-version">v0.4.8</span>
         </div>
       </div>
 
@@ -46,6 +46,15 @@
           </svg>
         </a>
 
+        <button id="btn-export" class="btn btn-export btn-sm" title="Export applications">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Export</span>
+        </button>
+
         <button id="btn-refresh" class="btn btn-secondary btn-sm" title="Rescan applications">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="23 4 23 10 17 10"></polyline>
@@ -55,7 +64,7 @@
           <span>Rescan</span>
         </button>
 
-        <button id="btn-settings" class="btn btn-outline btn-sm nav-settings-btn" title="Application Settings">
+        <button id="btn-settings" class="btn btn-secondary btn-sm nav-settings-btn" title="Application Settings">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -67,9 +76,9 @@
         <a href="https://github.com/PlasmaDrifter/AppIndex"
            target="_blank"
            rel="noopener noreferrer"
-           class="btn btn-outline btn-sm nav-github-btn"
+           class="btn btn-secondary btn-sm nav-github-btn"
            id="nav-github-link"
-           title="GitHub Repository (v0.4.7)">
+           title="GitHub Repository (v0.4.8)">
           <svg class="nav-github-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
           </svg>
@@ -81,21 +90,21 @@
     <main class="main-content">
       <!-- Toolbar: Search and Filter Tabs -->
       <div class="toolbar">
-        <div class="search-box">
-          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="search-input" placeholder="Search by name, package, executable, description..." autocomplete="off">
-          <button id="clear-search" class="clear-btn" aria-label="Clear search" title="Clear search" style="display: none;">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
+        <div class="toolbar-left">
+          <div class="search-box">
+            <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
-          </button>
-        </div>
+            <input type="text" id="search-input" placeholder="Search by name, package, executable, description..." autocomplete="off">
+            <button id="clear-search" class="clear-btn" aria-label="Clear search" title="Clear search" style="display: none;">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
 
-        <div class="filter-controls">
           <div class="select-wrapper">
             <label for="category-filter">Category:</label>
             <select id="category-filter">
@@ -114,6 +123,22 @@
             </select>
           </div>
 
+          <div class="toggle-wrapper">
+            <label class="toggle-label" for="toggle-hidden" title="Toggle visibility of hidden and helper applications">
+              <input type="checkbox" id="toggle-hidden">
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">Show Hidden</span>
+            </label>
+            <button id="btn-pin-hidden" class="btn-pin-toggle" type="button" title="Pin: Always show hidden apps on startup" aria-label="Pin hidden apps default">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="17" x2="12" y2="22"></line>
+                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar-right">
           <div class="select-wrapper">
             <label for="sort-by">Sort:</label>
             <select id="sort-by">
@@ -133,14 +158,6 @@
               <option value="menu_asc">Menu (Yes First)</option>
               <option value="menu_desc">Menu (No First)</option>
             </select>
-          </div>
-
-          <div class="toggle-wrapper">
-            <label class="toggle-label" for="toggle-hidden" title="Toggle visibility of hidden and helper applications">
-              <input type="checkbox" id="toggle-hidden">
-              <span class="toggle-slider"></span>
-              <span class="toggle-text">Show Hidden Apps</span>
-            </label>
           </div>
 
           <div class="view-toggle">
@@ -168,7 +185,8 @@
 
       <!-- Filter Tabs Bar -->
       <div class="filter-tabs-bar">
-        <div class="filter-tabs-scroll">
+        <div class="filter-tabs-scroll" id="filter-tabs-scroll">
+          <div class="tab-sliding-pill" id="tabSlidingPill" aria-hidden="true"></div>
           <button class="tab-btn active" data-source="all">All Apps (<span id="count-all">0</span>)</button>
           <button class="tab-btn" data-source="recently_updated" id="tab-recent">Recently Updated (<span id="count-recent">0</span>)</button>
           <button class="tab-btn" data-source="in_menu">In App Menu (<span id="count-menu">0</span>)</button>
@@ -180,7 +198,6 @@
           <button class="tab-btn" data-source="unmanaged">Unmanaged (<span id="count-unmanaged">0</span>)</button>
           <button class="tab-btn" data-source="hidden">Hidden / Helper (<span id="count-hidden">0</span>)</button>
         </div>
-        <button id="btn-export" class="tab-btn tab-btn-export" title="Export applications">Export</button>
       </div>
 
       <!-- Loading State -->
@@ -356,7 +373,7 @@
             <div>
               <div class="settings-title-row">
                 <h2>Application Settings</h2>
-                <span class="settings-version-tag" id="settings-app-version">v0.4.7</span>
+                <span class="settings-version-tag" id="settings-app-version">v0.4.8</span>
               </div>
               <span class="modal-subtitle">Customize themes, view density, and typography scaling</span>
             </div>
@@ -441,61 +458,165 @@
           <!-- Section 4: Custom Theme Builder -->
           <div class="settings-section" id="custom-theme-section">
             <h3 class="settings-section-title">Customize Theme Elements</h3>
-            <div class="color-pickers-grid">
-              <div class="color-picker-item">
-                <label for="color-bg-primary">App Background</label>
-                <div class="color-input-wrapper">
-                  <input type="color" id="color-bg-primary" value="#181926">
-                  <span class="color-hex" id="hex-bg-primary">#181926</span>
+            
+            <div class="theme-builder-columns">
+              <!-- Left Column: Surfaces & Typography -->
+              <div class="theme-builder-col">
+                <!-- Category 1: Core Surfaces & Borders -->
+                <div class="color-picker-category">
+                  <div class="color-picker-category-title">Core Surfaces &amp; Borders</div>
+                  <div class="color-pickers-grid">
+                    <div class="color-picker-item">
+                      <label for="color-bg-primary">App Background</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-bg-primary" value="#181926">
+                        <span class="color-hex" id="hex-bg-primary">#181926</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-bg-secondary">Bar &amp; Surface</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-bg-secondary" value="#1e2030">
+                        <span class="color-hex" id="hex-bg-secondary">#1e2030</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-bg-card">Card / Header</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-bg-card" value="#24273a">
+                        <span class="color-hex" id="hex-bg-card">#24273a</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-border">Border Color</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-border" value="#363a4f">
+                        <span class="color-hex" id="hex-border">#363a4f</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Category 2: Typography -->
+                <div class="color-picker-category">
+                  <div class="color-picker-category-title">Typography</div>
+                  <div class="color-pickers-grid">
+                    <div class="color-picker-item">
+                      <label for="color-text-primary">Primary Text</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-text-primary" value="#cad3f5">
+                        <span class="color-hex" id="hex-text-primary">#cad3f5</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-text-secondary">Secondary &amp; Code</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-text-secondary" value="#a5adcb">
+                        <span class="color-hex" id="hex-text-secondary">#a5adcb</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item span-2col">
+                      <label for="color-text-muted">Muted Text</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-text-muted" value="#8087a2">
+                        <span class="color-hex" id="hex-text-muted">#8087a2</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="color-picker-item">
-                <label for="color-bg-secondary">Bar &amp; Surface</label>
-                <div class="color-input-wrapper">
-                  <input type="color" id="color-bg-secondary" value="#1e2030">
-                  <span class="color-hex" id="hex-bg-secondary">#1e2030</span>
+
+              <!-- Right Column: Interface Accents & Package Source Badges -->
+              <div class="theme-builder-col">
+                <!-- Category 3: Interface Accents -->
+                <div class="color-picker-category">
+                  <div class="color-picker-category-title">Interface Accents</div>
+                  <div class="color-pickers-grid">
+                    <div class="color-picker-item">
+                      <label for="color-accent-blue">Primary Accent (Tabs)</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-accent-blue" value="#8aadf4">
+                        <span class="color-hex" id="hex-accent-blue">#8aadf4</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-accent-purple">Secondary Accent</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-accent-purple" value="#c6a0f6">
+                        <span class="color-hex" id="hex-accent-purple">#c6a0f6</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-accent-green">Recent Updates</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-accent-green" value="#a6da95">
+                        <span class="color-hex" id="hex-accent-green">#a6da95</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-accent-yellow">Export Button</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-accent-yellow" value="#eed49f">
+                        <span class="color-hex" id="hex-accent-yellow">#eed49f</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item span-2col">
+                      <label for="color-accent-orange">Alert &amp; Warning</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-accent-orange" value="#f5a97f">
+                        <span class="color-hex" id="hex-accent-orange">#f5a97f</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div class="color-picker-item">
-                <label for="color-bg-card">Card / Table Header</label>
-                <div class="color-input-wrapper">
-                  <input type="color" id="color-bg-card" value="#24273a">
-                  <span class="color-hex" id="hex-bg-card">#24273a</span>
-                </div>
-              </div>
-              <div class="color-picker-item">
-                <label for="color-border">Border Color</label>
-                <div class="color-input-wrapper">
-                  <input type="color" id="color-border" value="#363a4f">
-                  <span class="color-hex" id="hex-border">#363a4f</span>
-                </div>
-              </div>
-              <div class="color-picker-item">
-                <label for="color-text-primary">Primary Text</label>
-                <div class="color-input-wrapper">
-                  <input type="color" id="color-text-primary" value="#cad3f5">
-                  <span class="color-hex" id="hex-text-primary">#cad3f5</span>
-                </div>
-              </div>
-              <div class="color-picker-item">
-                <label for="color-text-muted">Muted Text</label>
-                <div class="color-input-wrapper">
-                  <input type="color" id="color-text-muted" value="#8087a2">
-                  <span class="color-hex" id="hex-text-muted">#8087a2</span>
-                </div>
-              </div>
-              <div class="color-picker-item">
-                <label for="color-accent-blue">Primary Accent</label>
-                <div class="color-input-wrapper">
-                  <input type="color" id="color-accent-blue" value="#8aadf4">
-                  <span class="color-hex" id="hex-accent-blue">#8aadf4</span>
-                </div>
-              </div>
-              <div class="color-picker-item">
-                <label for="color-accent-purple">Secondary Accent</label>
-                <div class="color-input-wrapper">
-                  <input type="color" id="color-accent-purple" value="#c6a0f6">
-                  <span class="color-hex" id="hex-accent-purple">#c6a0f6</span>
+
+                <!-- Category 4: Package Source Badges -->
+                <div class="color-picker-category">
+                  <div class="color-picker-category-title">Package Source Badges</div>
+                  <div class="color-pickers-grid">
+                    <div class="color-picker-item">
+                      <label for="color-badge-rpm">Repo (RPM)</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-badge-rpm" value="#8aadf4">
+                        <span class="color-hex" id="hex-badge-rpm">#8aadf4</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-badge-flatpak">Flatpak</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-badge-flatpak" value="#ee99a0">
+                        <span class="color-hex" id="hex-badge-flatpak">#ee99a0</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-badge-local">Local Apps</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-badge-local" value="#eed49f">
+                        <span class="color-hex" id="hex-badge-local">#eed49f</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-badge-appimage">AppImage</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-badge-appimage" value="#f5a97f">
+                        <span class="color-hex" id="hex-badge-appimage">#f5a97f</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-badge-steam">Steam</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-badge-steam" value="#c6a0f6">
+                        <span class="color-hex" id="hex-badge-steam">#c6a0f6</span>
+                      </div>
+                    </div>
+                    <div class="color-picker-item">
+                      <label for="color-badge-unmanaged">Unmanaged</label>
+                      <div class="color-input-wrapper">
+                        <input type="color" id="color-badge-unmanaged" value="#b8c0e0">
+                        <span class="color-hex" id="hex-badge-unmanaged">#b8c0e0</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

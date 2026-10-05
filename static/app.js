@@ -25,6 +25,7 @@ const sortBy = document.getElementById("sort-by");
 const viewCardsBtn = document.getElementById("view-cards-btn");
 const viewTableBtn = document.getElementById("view-table-btn");
 const toggleHidden = document.getElementById("toggle-hidden");
+const btnPinHidden = document.getElementById("btn-pin-hidden");
 const btnRefresh = document.getElementById("btn-refresh");
 const btnExport = document.getElementById("btn-export");
 const toast = document.getElementById("toast");
@@ -76,8 +77,15 @@ const PRESET_THEMES = {
       "--accent-cyan": "#7dc4e4",
       "--accent-purple": "#c6a0f6",
       "--accent-orange": "#f5a97f",
+      "--accent-yellow": "#eed49f",
       "--accent-green": "#a6da95",
-      "--accent-red": "#ed8796"
+      "--accent-red": "#ed8796",
+      "--badge-rpm-text": "#8aadf4",
+      "--badge-flatpak-text": "#ee99a0",
+      "--badge-local-text": "#eed49f",
+      "--badge-appimage-text": "#f5a97f",
+      "--badge-steam-text": "#c6a0f6",
+      "--badge-unmanaged-text": "#b8c0e0"
     },
     swatches: ["#181926", "#24273a", "#8aadf4", "#c6a0f6"]
   },
@@ -96,8 +104,15 @@ const PRESET_THEMES = {
       "--accent-cyan": "#7dcfff",
       "--accent-purple": "#bb9af7",
       "--accent-orange": "#ff9e64",
+      "--accent-yellow": "#e0af68",
       "--accent-green": "#9ece6a",
-      "--accent-red": "#f7768e"
+      "--accent-red": "#f7768e",
+      "--badge-rpm-text": "#7aa2f7",
+      "--badge-flatpak-text": "#f7768e",
+      "--badge-local-text": "#e0af68",
+      "--badge-appimage-text": "#ff9e64",
+      "--badge-steam-text": "#bb9af7",
+      "--badge-unmanaged-text": "#9aa5ce"
     },
     swatches: ["#1a1b26", "#24283b", "#7aa2f7", "#bb9af7"]
   },
@@ -116,8 +131,15 @@ const PRESET_THEMES = {
       "--accent-cyan": "#88c0d0",
       "--accent-purple": "#b48ead",
       "--accent-orange": "#d08770",
+      "--accent-yellow": "#ebcb8b",
       "--accent-green": "#a3be8c",
-      "--accent-red": "#bf616a"
+      "--accent-red": "#bf616a",
+      "--badge-rpm-text": "#88c0d0",
+      "--badge-flatpak-text": "#bf616a",
+      "--badge-local-text": "#ebcb8b",
+      "--badge-appimage-text": "#d08770",
+      "--badge-steam-text": "#b48ead",
+      "--badge-unmanaged-text": "#d8dee9"
     },
     swatches: ["#2e3440", "#3b4252", "#88c0d0", "#b48ead"]
   },
@@ -136,8 +158,15 @@ const PRESET_THEMES = {
       "--accent-cyan": "#8ec07c",
       "--accent-purple": "#d3869b",
       "--accent-orange": "#fe8019",
+      "--accent-yellow": "#fabd2f",
       "--accent-green": "#b8bb26",
-      "--accent-red": "#fb4934"
+      "--accent-red": "#fb4934",
+      "--badge-rpm-text": "#83a598",
+      "--badge-flatpak-text": "#fb4934",
+      "--badge-local-text": "#fabd2f",
+      "--badge-appimage-text": "#fe8019",
+      "--badge-steam-text": "#d3869b",
+      "--badge-unmanaged-text": "#d5c4a1"
     },
     swatches: ["#1d2021", "#32302f", "#83a598", "#fe8019"]
   },
@@ -156,8 +185,15 @@ const PRESET_THEMES = {
       "--accent-cyan": "#8be9fd",
       "--accent-purple": "#bd93f9",
       "--accent-orange": "#ffb86c",
+      "--accent-yellow": "#f1fa8c",
       "--accent-green": "#50fa7b",
-      "--accent-red": "#ff5555"
+      "--accent-red": "#ff5555",
+      "--badge-rpm-text": "#8be9fd",
+      "--badge-flatpak-text": "#ff5555",
+      "--badge-local-text": "#f1fa8c",
+      "--badge-appimage-text": "#ffb86c",
+      "--badge-steam-text": "#bd93f9",
+      "--badge-unmanaged-text": "#e2e2dc"
     },
     swatches: ["#21222c", "#343746", "#8be9fd", "#bd93f9"]
   },
@@ -176,8 +212,15 @@ const PRESET_THEMES = {
       "--accent-cyan": "#00f0ff",
       "--accent-purple": "#ff007f",
       "--accent-orange": "#ffb800",
+      "--accent-yellow": "#ffe600",
       "--accent-green": "#05ffa1",
-      "--accent-red": "#ff2a5f"
+      "--accent-red": "#ff2a5f",
+      "--badge-rpm-text": "#00f0ff",
+      "--badge-flatpak-text": "#ff2a5f",
+      "--badge-local-text": "#ffe600",
+      "--badge-appimage-text": "#ffb800",
+      "--badge-steam-text": "#ff007f",
+      "--badge-unmanaged-text": "#a0a5c0"
     },
     swatches: ["#0d0e15", "#1a1d2e", "#00f0ff", "#ff007f"]
   },
@@ -198,26 +241,15 @@ const PRESET_THEMES = {
       "--accent-blue": "#2563eb",
       "--accent-purple": "#7c3aed",
       "--accent-orange": "#ea580c",
+      "--accent-yellow": "#d97706",
       "--accent-green": "#16a34a",
       "--accent-red": "#dc2626",
       "--accent-cyan": "#0284c7",
-      "--badge-rpm-bg": "rgba(37, 99, 235, 0.12)",
-      "--badge-rpm-border": "rgba(37, 99, 235, 0.35)",
       "--badge-rpm-text": "#1d4ed8",
-      "--badge-flatpak-bg": "rgba(225, 29, 72, 0.12)",
-      "--badge-flatpak-border": "rgba(225, 29, 72, 0.35)",
       "--badge-flatpak-text": "#be123c",
-      "--badge-local-bg": "rgba(202, 138, 4, 0.12)",
-      "--badge-local-border": "rgba(202, 138, 4, 0.35)",
       "--badge-local-text": "#a16207",
-      "--badge-appimage-bg": "rgba(234, 88, 12, 0.12)",
-      "--badge-appimage-border": "rgba(234, 88, 12, 0.35)",
       "--badge-appimage-text": "#c2410c",
-      "--badge-steam-bg": "rgba(124, 58, 237, 0.12)",
-      "--badge-steam-border": "rgba(124, 58, 237, 0.35)",
       "--badge-steam-text": "#6d28d9",
-      "--badge-unmanaged-bg": "rgba(100, 116, 139, 0.12)",
-      "--badge-unmanaged-border": "rgba(100, 116, 139, 0.35)",
       "--badge-unmanaged-text": "#334155"
     },
     swatches: ["#f8fafc", "#ffffff", "#2563eb", "#7c3aed"]
@@ -225,14 +257,31 @@ const PRESET_THEMES = {
 };
 
 const COLOR_PICKER_MAP = [
+  // Core Surfaces & Borders
   { inputId: "color-bg-primary", hexId: "hex-bg-primary", varName: "--bg-primary" },
   { inputId: "color-bg-secondary", hexId: "hex-bg-secondary", varName: "--bg-secondary" },
   { inputId: "color-bg-card", hexId: "hex-bg-card", varName: "--bg-card" },
   { inputId: "color-border", hexId: "hex-border", varName: "--border-color" },
+
+  // Typography
   { inputId: "color-text-primary", hexId: "hex-text-primary", varName: "--text-primary" },
+  { inputId: "color-text-secondary", hexId: "hex-text-secondary", varName: "--text-secondary" },
   { inputId: "color-text-muted", hexId: "hex-text-muted", varName: "--text-muted" },
+
+  // Interface Accents
   { inputId: "color-accent-blue", hexId: "hex-accent-blue", varName: "--accent-blue" },
   { inputId: "color-accent-purple", hexId: "hex-accent-purple", varName: "--accent-purple" },
+  { inputId: "color-accent-green", hexId: "hex-accent-green", varName: "--accent-green" },
+  { inputId: "color-accent-yellow", hexId: "hex-accent-yellow", varName: "--accent-yellow" },
+  { inputId: "color-accent-orange", hexId: "hex-accent-orange", varName: "--accent-orange" },
+
+  // Package Source Badges
+  { inputId: "color-badge-rpm", hexId: "hex-badge-rpm", varName: "--badge-rpm-text" },
+  { inputId: "color-badge-flatpak", hexId: "hex-badge-flatpak", varName: "--badge-flatpak-text" },
+  { inputId: "color-badge-local", hexId: "hex-badge-local", varName: "--badge-local-text" },
+  { inputId: "color-badge-appimage", hexId: "hex-badge-appimage", varName: "--badge-appimage-text" },
+  { inputId: "color-badge-steam", hexId: "hex-badge-steam", varName: "--badge-steam-text" },
+  { inputId: "color-badge-unmanaged", hexId: "hex-badge-unmanaged", varName: "--badge-unmanaged-text" },
 ];
 
 let userSettings = {
@@ -246,7 +295,8 @@ let userSettings = {
   servicesDashboardUrl: "http://localhost:5100",
   showGitHubBtn: true,
   checkForUpdates: true,
-  recentHours: 48
+  recentHours: 48,
+  defaultShowHidden: false
 };
 
 // Settings Modal Elements
@@ -281,6 +331,11 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("Error initializing settings UI:", err);
   }
   try {
+    initSlidingPill();
+  } catch (err) {
+    console.error("Error initializing sliding pill:", err);
+  }
+  try {
     setupEventListeners();
   } catch (err) {
     console.error("Error setting up event listeners:", err);
@@ -298,6 +353,71 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("Error checking for updates:", err);
   }
 });
+
+// --- Smooth Sliding Active Pill Indicator for Categories ---
+let pillInitialized = false;
+
+function updateSlidingPill(activeTab = null, animate = true) {
+  const tabsScroll = document.getElementById("filter-tabs-scroll");
+  const tabSlidingPill = document.getElementById("tabSlidingPill");
+  if (!tabsScroll || !tabSlidingPill) return;
+
+  const targetTab = activeTab || tabsScroll.querySelector(".tab-btn.active");
+  if (!targetTab || window.getComputedStyle(targetTab).display === "none") {
+    tabSlidingPill.style.opacity = "0";
+    return;
+  }
+
+  const scrollRect = tabsScroll.getBoundingClientRect();
+  const tabRect = targetTab.getBoundingClientRect();
+  const x = tabRect.left - scrollRect.left + tabsScroll.scrollLeft;
+  const y = tabRect.top - scrollRect.top + tabsScroll.scrollTop;
+  const w = tabRect.width;
+  const h = tabRect.height;
+
+  if (w <= 0 || h <= 0) return;
+
+  if (!animate || !pillInitialized) {
+    tabSlidingPill.style.transition = "none";
+    tabSlidingPill.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    tabSlidingPill.style.width = `${w}px`;
+    tabSlidingPill.style.height = `${h}px`;
+    tabSlidingPill.style.opacity = "1";
+    void tabSlidingPill.offsetWidth; // Force reflow
+    tabSlidingPill.style.transition = "";
+  } else {
+    tabSlidingPill.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    tabSlidingPill.style.width = `${w}px`;
+    tabSlidingPill.style.height = `${h}px`;
+    tabSlidingPill.style.opacity = "1";
+  }
+
+  if (!pillInitialized) {
+    tabsScroll.classList.add("has-pill");
+    pillInitialized = true;
+  }
+}
+
+function initSlidingPill() {
+  const tabsScroll = document.getElementById("filter-tabs-scroll");
+  if (!tabsScroll) return;
+
+  requestAnimationFrame(() => {
+    updateSlidingPill(null, false);
+  });
+
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => updateSlidingPill(null, false));
+    ro.observe(tabsScroll);
+  }
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => updateSlidingPill(null, false));
+  }
+
+  window.addEventListener("resize", () => updateSlidingPill(null, false));
+  window.addEventListener("load", () => updateSlidingPill(null, false));
+}
 
 function resetScrollPosition() {
   if (appsTableContainer) appsTableContainer.scrollTop = 0;
@@ -345,6 +465,26 @@ function setupEventListeners() {
     });
   }
 
+  // Pin Hidden Apps Default on Startup
+  if (btnPinHidden) {
+    btnPinHidden.addEventListener("click", () => {
+      userSettings.defaultShowHidden = !userSettings.defaultShowHidden;
+      saveSettingsToStorage();
+      updatePinHiddenUI();
+
+      if (userSettings.defaultShowHidden) {
+        if (toggleHidden && !toggleHidden.checked) {
+          toggleHidden.checked = true;
+          resetScrollPosition();
+          renderApplications();
+        }
+        showToast("Saved: Hidden apps will show by default on startup");
+      } else {
+        showToast("Reset: Hidden apps will be hidden on startup");
+      }
+    });
+  }
+
   // View toggle
   viewCardsBtn.addEventListener("click", () => {
     currentViewMode = "cards";
@@ -372,9 +512,12 @@ function setupEventListeners() {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".tab-btn[data-source]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
+      updateSlidingPill(btn, true);
       currentSourceFilter = btn.dataset.source;
       resetScrollPosition();
-      renderApplications();
+      requestAnimationFrame(() => {
+        renderApplications();
+      });
     });
   });
 
@@ -738,6 +881,15 @@ async function loadApplications() {
       currentSearchTerm = qParam.toLowerCase().trim();
       clearSearchBtn.style.display = "flex";
     }
+    if (urlParams.has("hidden")) {
+      const hVal = (urlParams.get("hidden") || "").toLowerCase().trim();
+      if (toggleHidden) {
+        toggleHidden.checked = hVal === "1" || hVal === "true" || hVal === "yes" || hVal === "on";
+      }
+    } else if (toggleHidden) {
+      toggleHidden.checked = Boolean(userSettings.defaultShowHidden);
+    }
+    updatePinHiddenUI();
     renderApplications();
     updateSortHeaderUI();
   } catch (err) {
@@ -791,6 +943,7 @@ function updateStatsUI() {
   if (countUnmanaged) countUnmanaged.textContent = appStats.unmanaged ?? 0;
   const countHidden = document.getElementById("count-hidden");
   if (countHidden) countHidden.textContent = appStats.hidden ?? 0;
+  requestAnimationFrame(() => updateSlidingPill(null, false));
 }
 
 // Filter and sort applications
@@ -1423,7 +1576,8 @@ function loadSavedSettings() {
         servicesDashboardUrl: parsed.servicesDashboardUrl || "http://localhost:5100",
         showGitHubBtn: parsed.showGitHubBtn !== undefined ? Boolean(parsed.showGitHubBtn) : true,
         checkForUpdates: parsed.checkForUpdates !== undefined ? Boolean(parsed.checkForUpdates) : true,
-        recentHours: typeof parsed.recentHours === "number" && parsed.recentHours > 0 ? parsed.recentHours : 48
+        recentHours: typeof parsed.recentHours === "number" && parsed.recentHours > 0 ? parsed.recentHours : 48,
+        defaultShowHidden: Boolean(parsed.defaultShowHidden)
       };
     }
   } catch (err) {
@@ -1712,11 +1866,13 @@ function applyDensity(density) {
   if (!document.body) return;
   document.body.classList.remove("density-compact", "density-standard", "density-spacious");
   document.body.classList.add("density-" + (density || "standard"));
+  requestAnimationFrame(() => updateSlidingPill(null, false));
 }
 
 function applyFontScale(scaleVal) {
   const scale = (scaleVal || 100) / 100;
   document.documentElement.style.setProperty("--font-scale", scale.toString());
+  requestAnimationFrame(() => updateSlidingPill(null, false));
 }
 
 function initSettingsUI() {
@@ -1843,6 +1999,19 @@ function syncSettingsUI() {
       btn.classList.toggle("active", parseInt(btn.dataset.hours, 10) === recentHours);
     });
   }
+
+  // Sync Pin Hidden Button
+  updatePinHiddenUI();
+}
+
+function updatePinHiddenUI() {
+  if (!btnPinHidden) return;
+  const isPinned = Boolean(userSettings.defaultShowHidden);
+  btnPinHidden.classList.toggle("active", isPinned);
+  btnPinHidden.title = isPinned
+    ? "Hidden apps pinned ON by default (click to unpin)"
+    : "Pin: Always show hidden apps on startup";
+  btnPinHidden.setAttribute("aria-pressed", isPinned ? "true" : "false");
 }
 
 function formatRecentHoursBadge(hours) {
