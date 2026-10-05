@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 import threading
 import time
-from typing import Optional, List, Set, Tuple, Dict
+from typing import Optional, Set, Tuple, Dict
 import urllib.request
 from fastapi import FastAPI, Query, HTTPException, Response, Request
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
@@ -32,7 +32,7 @@ except ImportError:
 from scanner import scan_all_applications
 from usage_tracker import start_background_usage_sync
 
-APP_VERSION = "0.4.8"
+APP_VERSION = "0.4.9"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -165,7 +165,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.4.8"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.4.9"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()

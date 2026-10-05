@@ -683,24 +683,24 @@ def parse_desktop_file(filepath: str, active_desktops: Optional[set] = None) -> 
             in_menu = False
 
     primary_category = "Other"
-    cat_lower = [c.lower() for c in categories]
-    if any(c in cat_lower for c in ["game", "games", "emulator"]):
+    cat_set = {c.lower() for c in categories}
+    if cat_set & {"game", "games", "emulator"}:
         primary_category = "Games"
-    elif any(c in cat_lower for c in ["audiovideo", "audio", "video", "multimedia", "player"]):
+    elif cat_set & {"audiovideo", "audio", "video", "multimedia", "player"}:
         primary_category = "Audio & Video"
-    elif any(c in cat_lower for c in ["development", "ide", "programming", "debugger"]):
+    elif cat_set & {"development", "ide", "programming", "debugger"}:
         primary_category = "Development"
-    elif any(c in cat_lower for c in ["graphics", "rastergraphics", "photography", "viewer"]):
+    elif cat_set & {"graphics", "rastergraphics", "photography", "viewer"}:
         primary_category = "Graphics"
-    elif any(c in cat_lower for c in ["network", "webbrowser", "chat", "email", "telephony"]):
+    elif cat_set & {"network", "webbrowser", "chat", "email", "telephony"}:
         primary_category = "Internet"
-    elif any(c in cat_lower for c in ["office", "wordprocessor", "spreadsheet"]):
+    elif cat_set & {"office", "wordprocessor", "spreadsheet"}:
         primary_category = "Office"
-    elif any(c in cat_lower for c in ["system", "terminalemulator", "monitor"]):
+    elif cat_set & {"system", "terminalemulator", "monitor"}:
         primary_category = "System"
-    elif any(c in cat_lower for c in ["utility", "utilities", "archiving", "calculator"]):
+    elif cat_set & {"utility", "utilities", "archiving", "calculator"}:
         primary_category = "Utilities"
-    elif any(c in cat_lower for c in ["settings", "desktopsettings"]):
+    elif cat_set & {"settings", "desktopsettings"}:
         primary_category = "Settings"
 
     return {

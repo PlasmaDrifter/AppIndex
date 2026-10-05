@@ -17,7 +17,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 logger = logging.getLogger("appindex.usage")
 
@@ -110,9 +110,6 @@ def normalize_unit_name(unit_raw: str) -> str:
     return clean.strip()
 
 
-parse_unit_name = normalize_unit_name
-
-
 def sync_journal_history(force_full: bool = False):
     """
     Parse systemd user journal entries for app launches.
@@ -166,7 +163,7 @@ def sync_journal_history(force_full: bool = False):
                 if not unit:
                     continue
 
-                clean_name = parse_unit_name(unit)
+                clean_name = normalize_unit_name(unit)
                 if not clean_name:
                     continue
 
