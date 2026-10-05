@@ -36,6 +36,8 @@ const modalAppIcon = document.getElementById("modal-app-icon");
 const modalAppName = document.getElementById("modal-app-name");
 const modalAppGeneric = document.getElementById("modal-app-generic");
 const modalSourceLabel = document.getElementById("modal-source-label");
+const modalOriginRow = document.getElementById("modal-origin-row");
+const modalPackageOrigin = document.getElementById("modal-package-origin");
 const modalPackageName = document.getElementById("modal-package-name");
 const modalVersionArch = document.getElementById("modal-version-arch");
 const modalTransitionRow = document.getElementById("modal-transition-row");
@@ -202,9 +204,9 @@ const PRESET_THEMES = {
       "--badge-rpm-bg": "rgba(37, 99, 235, 0.12)",
       "--badge-rpm-border": "rgba(37, 99, 235, 0.35)",
       "--badge-rpm-text": "#1d4ed8",
-      "--badge-flatpak-bg": "rgba(22, 163, 74, 0.12)",
-      "--badge-flatpak-border": "rgba(22, 163, 74, 0.35)",
-      "--badge-flatpak-text": "#15803d",
+      "--badge-flatpak-bg": "rgba(225, 29, 72, 0.12)",
+      "--badge-flatpak-border": "rgba(225, 29, 72, 0.35)",
+      "--badge-flatpak-text": "#be123c",
       "--badge-local-bg": "rgba(202, 138, 4, 0.12)",
       "--badge-local-border": "rgba(202, 138, 4, 0.35)",
       "--badge-local-text": "#a16207",
@@ -332,6 +334,7 @@ function setupEventListeners() {
     currentSort = e.target.value;
     resetScrollPosition();
     renderApplications();
+    updateSortHeaderUI();
   });
 
   // Toggle Hidden Apps
@@ -361,6 +364,7 @@ function setupEventListeners() {
     appsTableContainer.style.display = "block";
     resetScrollPosition();
     renderApplications();
+    updateSortHeaderUI();
   });
 
   // Filter tabs
@@ -373,6 +377,12 @@ function setupEventListeners() {
       renderApplications();
     });
   });
+
+  // Table column header sorting
+  const appsTableThead = document.querySelector(".apps-table thead");
+  if (appsTableThead) {
+    appsTableThead.addEventListener("click", handleColumnHeaderClick);
+  }
 
   // Delegated table actions (inspect, copy)
   appsTableBody.addEventListener("click", (e) => {
@@ -594,6 +604,9 @@ function setupEventListeners() {
     clearSearchBtn.style.display = "none";
     categoryFilter.value = "all";
     currentCategoryFilter = "all";
+    currentSort = "name_asc";
+    if (sortBy) sortBy.value = "name_asc";
+    updateSortHeaderUI();
     const allTab = document.querySelector('.tab-btn[data-source="all"]');
     if (allTab) allTab.click();
   });
@@ -726,6 +739,7 @@ async function loadApplications() {
       clearSearchBtn.style.display = "flex";
     }
     renderApplications();
+    updateSortHeaderUI();
   } catch (err) {
     showToast("Error loading application catalog");
   } finally {
@@ -826,21 +840,130 @@ function getFilteredApps() {
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     } else if (currentSort === "name_desc") {
       return b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
-    } else if (currentSort === "source") {
-      return a.source_label.localeCompare(b.source_label);
-    } else if (currentSort === "pkg") {
-      return (a.package_name || "").localeCompare(b.package_name || "");
+    } else if (currentSort === "source" || currentSort === "source_asc") {
+      return a.source_label.localeCompare(b.source_label) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "source_desc") {
+      return b.source_label.localeCompare(a.source_label) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "pkg" || currentSort === "pkg_asc") {
+      return (a.package_name || "").localeCompare(b.package_name || "") || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "pkg_desc") {
+      return (b.package_name || "").localeCompare(a.package_name || "") || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     } else if (currentSort === "updated_desc") {
       return (b.install_time || 0) - (a.install_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     } else if (currentSort === "updated_asc") {
       return (a.install_time || 0) - (b.install_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "version_desc") {
+      return (b.package_version || "").localeCompare(a.package_version || "", undefined, { numeric: true, sensitivity: "base" }) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "version_asc") {
+      return (a.package_version || "").localeCompare(b.package_version || "", undefined, { numeric: true, sensitivity: "base" }) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     } else if (currentSort === "last_used_desc") {
       return (b.last_used_time || 0) - (a.last_used_time || 0) || (b.launch_count || 0) - (a.launch_count || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "last_used_asc") {
+      const aTime = a.last_used_time || Number.MAX_SAFE_INTEGER;
+      const bTime = b.last_used_time || Number.MAX_SAFE_INTEGER;
+      return aTime - bTime || (a.launch_count || 0) - (b.launch_count || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     } else if (currentSort === "launches_desc") {
       return (b.launch_count || 0) - (a.launch_count || 0) || (b.last_used_time || 0) - (a.last_used_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "menu_asc") {
+      return (b.in_menu ? 1 : 0) - (a.in_menu ? 1 : 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "menu_desc") {
+      return (a.in_menu ? 1 : 0) - (b.in_menu ? 1 : 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     }
     return 0;
   });
+}
+
+function updateSortHeaderUI() {
+  const headers = document.querySelectorAll(".apps-table th.sortable");
+  headers.forEach((th) => {
+    th.classList.remove("sorted-asc", "sorted-desc");
+    const key = th.dataset.sortKey;
+
+    if (key === "name") {
+      if (currentSort === "name_asc") th.classList.add("sorted-asc");
+      else if (currentSort === "name_desc") th.classList.add("sorted-desc");
+    } else if (key === "updated") {
+      if (currentSort === "updated_desc") th.classList.add("sorted-desc");
+      else if (currentSort === "updated_asc") th.classList.add("sorted-asc");
+    } else if (key === "version") {
+      if (currentSort === "version_desc") th.classList.add("sorted-desc");
+      else if (currentSort === "version_asc") th.classList.add("sorted-asc");
+    } else if (key === "source") {
+      if (currentSort === "source" || currentSort === "source_asc") th.classList.add("sorted-asc");
+      else if (currentSort === "source_desc") th.classList.add("sorted-desc");
+    } else if (key === "pkg") {
+      if (currentSort === "pkg" || currentSort === "pkg_asc") th.classList.add("sorted-asc");
+      else if (currentSort === "pkg_desc") th.classList.add("sorted-desc");
+    } else if (key === "usage") {
+      if (currentSort === "last_used_desc" || currentSort === "launches_desc") th.classList.add("sorted-desc");
+      else if (currentSort === "last_used_asc") th.classList.add("sorted-asc");
+    } else if (key === "menu") {
+      if (currentSort === "menu_asc") th.classList.add("sorted-asc");
+      else if (currentSort === "menu_desc") th.classList.add("sorted-desc");
+    }
+  });
+
+  if (sortBy) {
+    const opt = sortBy.querySelector(`option[value="${currentSort}"]`);
+    if (opt) {
+      sortBy.value = currentSort;
+    } else if (currentSort === "source_asc") {
+      sortBy.value = "source";
+    } else if (currentSort === "pkg_asc") {
+      sortBy.value = "pkg";
+    }
+  }
+}
+
+function handleColumnHeaderClick(e) {
+  const th = e.target.closest("th.sortable");
+  if (!th) return;
+
+  const key = th.dataset.sortKey;
+  if (!key) return;
+
+  let nextSort = "name_asc";
+
+  if (key === "name") {
+    // Cycle: name_asc -> name_desc -> name_asc (reset)
+    if (currentSort === "name_asc") nextSort = "name_desc";
+    else nextSort = "name_asc";
+  } else if (key === "updated") {
+    // Cycle: updated_desc -> updated_asc -> name_asc (reset)
+    if (currentSort === "updated_desc") nextSort = "updated_asc";
+    else if (currentSort === "updated_asc") nextSort = "name_asc";
+    else nextSort = "updated_desc";
+  } else if (key === "version") {
+    // Cycle: version_desc -> version_asc -> name_asc (reset)
+    if (currentSort === "version_desc") nextSort = "version_asc";
+    else if (currentSort === "version_asc") nextSort = "name_asc";
+    else nextSort = "version_desc";
+  } else if (key === "source") {
+    // Cycle: source_asc -> source_desc -> name_asc (reset)
+    if (currentSort === "source" || currentSort === "source_asc") nextSort = "source_desc";
+    else if (currentSort === "source_desc") nextSort = "name_asc";
+    else nextSort = "source_asc";
+  } else if (key === "pkg") {
+    // Cycle: pkg_asc -> pkg_desc -> name_asc (reset)
+    if (currentSort === "pkg" || currentSort === "pkg_asc") nextSort = "pkg_desc";
+    else if (currentSort === "pkg_desc") nextSort = "name_asc";
+    else nextSort = "pkg_asc";
+  } else if (key === "usage") {
+    // Cycle: last_used_desc -> last_used_asc -> name_asc (reset)
+    if (currentSort === "last_used_desc" || currentSort === "launches_desc") nextSort = "last_used_asc";
+    else if (currentSort === "last_used_asc") nextSort = "name_asc";
+    else nextSort = "last_used_desc";
+  } else if (key === "menu") {
+    // Cycle: menu_asc -> menu_desc -> name_asc (reset)
+    if (currentSort === "menu_asc") nextSort = "menu_desc";
+    else if (currentSort === "menu_desc") nextSort = "name_asc";
+    else nextSort = "menu_asc";
+  }
+
+  currentSort = nextSort;
+  resetScrollPosition();
+  renderApplications();
+  updateSortHeaderUI();
 }
 
 // Render the application list
@@ -1061,12 +1184,19 @@ function renderTable(apps) {
         ${usageCellHtml}
       </td>
       <td class="col-menu-status">
-        <span class="badge ${app.in_menu ? "badge-menu" : "badge-hidden"}">
-          ${app.in_menu ? "In Menu" : "Hidden"}
+        <span class="menu-status-text ${app.in_menu ? "yes" : "no"}" title="${app.in_menu ? "Visible in Application Menu" : "Hidden / Helper Application"}">
+          ${app.in_menu ? "YES" : "NO"}
         </span>
       </td>
       <td class="col-action">
-        <button class="btn btn-outline btn-sm btn-table-inspect">Inspect</button>
+        <button class="btn btn-sm btn-table-inspect" title="View application details and metadata">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span>Details</span>
+        </button>
       </td>
     `;
 
@@ -1088,6 +1218,15 @@ function openModal(app) {
   modalAppName.textContent = app.name;
   modalAppGeneric.textContent = app.generic_name || app.comment || "";
   modalSourceLabel.textContent = app.source_label;
+  if (modalOriginRow && modalPackageOrigin) {
+    if (app.repo_origin) {
+      modalOriginRow.style.display = "flex";
+      modalPackageOrigin.textContent = app.repo_origin;
+    } else {
+      modalOriginRow.style.display = "none";
+      modalPackageOrigin.textContent = "";
+    }
+  }
   modalPackageName.textContent = app.package_name || "N/A";
   modalVersionArch.textContent = [app.package_version, app.package_arch].filter(Boolean).join(" / ") || "N/A";
   if (modalLastUpdated) {

@@ -26,7 +26,7 @@
         </div>
         <div class="brand-text">
           <h1>AppIndex</h1>
-          <span class="brand-version" id="brand-app-version">v0.4.6</span>
+          <span class="brand-version" id="brand-app-version">v0.4.7</span>
         </div>
       </div>
 
@@ -69,7 +69,7 @@
            rel="noopener noreferrer"
            class="btn btn-outline btn-sm nav-github-btn"
            id="nav-github-link"
-           title="GitHub Repository (v0.4.6)">
+           title="GitHub Repository (v0.4.7)">
           <svg class="nav-github-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
           </svg>
@@ -100,7 +100,7 @@
             <label for="category-filter">Category:</label>
             <select id="category-filter">
               <option value="all">All Categories</option>
-              <option value="Local Tools">Local Tools</option>
+              <option value="Local Apps">Local Apps</option>
               <option value="Audio & Video">Audio &amp; Video</option>
               <option value="Development">Development</option>
               <option value="Games">Games</option>
@@ -119,12 +119,19 @@
             <select id="sort-by">
               <option value="name_asc">Name (A-Z)</option>
               <option value="name_desc">Name (Z-A)</option>
-              <option value="launches_desc">Most Frequently Used</option>
-              <option value="last_used_desc">Recently Opened</option>
               <option value="updated_desc">Recently Updated (Newest)</option>
               <option value="updated_asc">Least Recently Updated (Oldest)</option>
-              <option value="source">Install Source</option>
-              <option value="pkg">Package Name</option>
+              <option value="version_desc">Version (Highest)</option>
+              <option value="version_asc">Version (Lowest)</option>
+              <option value="source_asc">Install Source (A-Z)</option>
+              <option value="source_desc">Install Source (Z-A)</option>
+              <option value="pkg_asc">Package Name (A-Z)</option>
+              <option value="pkg_desc">Package Name (Z-A)</option>
+              <option value="last_used_desc">Recently Opened</option>
+              <option value="last_used_asc">Least Recently Opened</option>
+              <option value="launches_desc">Most Frequently Used</option>
+              <option value="menu_asc">Menu (Yes First)</option>
+              <option value="menu_desc">Menu (No First)</option>
             </select>
           </div>
 
@@ -165,7 +172,7 @@
           <button class="tab-btn active" data-source="all">All Apps (<span id="count-all">0</span>)</button>
           <button class="tab-btn" data-source="recently_updated" id="tab-recent">Recently Updated (<span id="count-recent">0</span>)</button>
           <button class="tab-btn" data-source="in_menu">In App Menu (<span id="count-menu">0</span>)</button>
-          <button class="tab-btn" data-source="local_tool">Local Tools (<span id="count-local">0</span>)</button>
+          <button class="tab-btn" data-source="local_tool">Local Apps (<span id="count-local">0</span>)</button>
           <button class="tab-btn" data-source="repo_system" id="tab-repo">Repo (<span id="repo-pkg-mgr">RPM</span>) (<span id="count-rpm">0</span>)</button>
           <button class="tab-btn" data-source="flatpak">Flatpak (<span id="count-flatpak">0</span>)</button>
           <button class="tab-btn" data-source="appimage">AppImage (<span id="count-appimage">0</span>)</button>
@@ -202,14 +209,35 @@
           <thead>
             <tr>
               <th class="col-icon">Icon</th>
-              <th class="col-app-name">Application Name</th>
-              <th class="col-last-updated">Last Updated</th>
-              <th class="col-version">Version</th>
-              <th class="col-install-type">Install Type</th>
-              <th class="col-uninstall-cmd">Uninstall Command</th>
-              <th class="col-usage">Last Used</th>
-              <th class="col-menu-status">Menu Status</th>
-              <th class="col-action">Action</th>
+              <th class="col-app-name sortable" data-sort-key="name" title="Sort by Application Name">
+                <span>Application Name</span>
+                <span class="sort-indicator"></span>
+              </th>
+              <th class="col-last-updated sortable" data-sort-key="updated" title="Sort by Last Updated">
+                <span>Last Updated</span>
+                <span class="sort-indicator"></span>
+              </th>
+              <th class="col-version sortable" data-sort-key="version" title="Sort by Version">
+                <span>Version</span>
+                <span class="sort-indicator"></span>
+              </th>
+              <th class="col-install-type sortable" data-sort-key="source" title="Sort by Install Type">
+                <span>Install Type</span>
+                <span class="sort-indicator"></span>
+              </th>
+              <th class="col-uninstall-cmd sortable" data-sort-key="pkg" title="Sort by Package Name">
+                <span>Uninstall Command</span>
+                <span class="sort-indicator"></span>
+              </th>
+              <th class="col-usage sortable" data-sort-key="usage" title="Sort by Last Opened / Frequency">
+                <span>Last Used</span>
+                <span class="sort-indicator"></span>
+              </th>
+              <th class="col-menu-status sortable" data-sort-key="menu" title="Sort by Menu Status (In Menu vs Hidden)">
+                <span>Menu</span>
+                <span class="sort-indicator"></span>
+              </th>
+              <th class="col-action">Details</th>
             </tr>
           </thead>
           <tbody id="apps-table-body"></tbody>
@@ -236,6 +264,10 @@
             <div class="info-row">
               <span class="info-label">Installation Source:</span>
               <span class="info-value" id="modal-source-label"></span>
+            </div>
+            <div class="info-row" id="modal-origin-row" style="display: none;">
+              <span class="info-label">Repository / Packager:</span>
+              <span class="info-value" id="modal-package-origin"></span>
             </div>
             <div class="info-row">
               <span class="info-label">Package Name:</span>
@@ -324,7 +356,7 @@
             <div>
               <div class="settings-title-row">
                 <h2>Application Settings</h2>
-                <span class="settings-version-tag" id="settings-app-version">v0.4.6</span>
+                <span class="settings-version-tag" id="settings-app-version">v0.4.7</span>
               </div>
               <span class="modal-subtitle">Customize themes, view density, and typography scaling</span>
             </div>
@@ -695,7 +727,7 @@
               </label>
               <label class="export-check-item">
                 <input type="checkbox" name="export-source" value="local_tool" checked>
-                <span>Local Tools</span>
+                <span>Local Apps</span>
               </label>
               <label class="export-check-item">
                 <input type="checkbox" name="export-source" value="unmanaged,web_app" checked>

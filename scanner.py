@@ -243,6 +243,10 @@ def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, Any]]:
                     sz = hdr["size"]
                     summary = hdr["summary"]
                     inst_time = float(hdr["installtime"]) if "installtime" in hdr else 0.0
+                    vendor = str(hdr["vendor"]) if "vendor" in hdr and hdr["vendor"] else ""
+                    packager = str(hdr["packager"]) if "packager" in hdr and hdr["packager"] else ""
+                    buildhost = str(hdr["buildhost"]) if "buildhost" in hdr and hdr["buildhost"] else ""
+                    release = str(hdr["release"]) if "release" in hdr and hdr["release"] else ""
                     results[filepath] = {
                         "name": pkg_name,
                         "version": version,
@@ -251,6 +255,10 @@ def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, Any]]:
                         "summary": summary,
                         "install_time": inst_time,
                         "install_date": format_timestamp(inst_time),
+                        "vendor": vendor,
+                        "packager": packager,
+                        "buildhost": buildhost,
+                        "release": release,
                     }
                     break
             return results
@@ -263,7 +271,7 @@ def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, Any]]:
         chunk = file_paths[i : i + batch_size]
         for f in chunk:
             try:
-                cmd = ["rpm", "-qf", "--queryformat", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\t%{SIZE}\t%{INSTALLTIME}\t%{SUMMARY}\n", f]
+                cmd = ["rpm", "-qf", "--queryformat", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\t%{SIZE}\t%{INSTALLTIME}\t%{SUMMARY}\t%{VENDOR}\t%{PACKAGER}\t%{RELEASE}\n", f]
                 res = subprocess.run(cmd, capture_output=True, text=True, check=False)
                 line = res.stdout.strip()
                 if res.returncode == 0 and "\t" in line:
@@ -286,11 +294,100 @@ def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, Any]]:
                         "summary": parts[5].strip() if len(parts) > 5 else "",
                         "install_time": inst_time,
                         "install_date": format_timestamp(inst_time),
+                        "vendor": parts[6].strip() if len(parts) > 6 else "",
+                        "packager": parts[7].strip() if len(parts) > 7 else "",
+                        "buildhost": "",
+                        "release": parts[8].strip() if len(parts) > 8 else "",
                     }
             except Exception:
                 pass
 
     return results
+
+
+def resolve_rpm_origin(
+    vendor: str,
+    packager: str,
+    buildhost: str = "",
+    release: str = "",
+    distro_name: str = "System",
+) -> Dict[str, str]:
+    """Resolve specific repository origin and badge label from RPM vendor, packager, and release metadata."""
+    v_lower = (vendor or "").lower()
+    p_lower = (packager or "").lower()
+    combined = f"{v_lower} {p_lower} {(buildhost or '').lower()} {(release or '').lower()}"
+
+    # 1. Terra Repository (Fyra Labs)
+    if "terra" in v_lower or "terra" in p_lower or "fyralabs.com" in p_lower or "fyralabs" in v_lower:
+        packager_info = packager if packager else "Fyra Labs"
+        return {
+            "origin": "Terra",
+            "badge_label": "Terra (RPM)",
+            "packager_detail": f"Terra ({packager_info})",
+        }
+
+    # 2. Fedora COPR
+    if "copr" in v_lower or "copr" in p_lower:
+        # Check if Nobara's core COPR repository (built by gloriouseggroll)
+        if "gloriouseggroll" in combined:
+            return {
+                "origin": "Nobara",
+                "badge_label": "Nobara (RPM)",
+                "packager_detail": "Nobara Official (COPR gloriouseggroll)",
+            }
+        # Other third-party COPR
+        copr_match = re.search(r"user\s+([a-zA-Z0-9_\-\.]+)", vendor, re.IGNORECASE)
+        copr_user = copr_match.group(1) if copr_match else ""
+        if copr_user:
+            return {
+                "origin": f"COPR ({copr_user})",
+                "badge_label": f"COPR ({copr_user}) (RPM)",
+                "packager_detail": f"Fedora COPR (user: {copr_user})",
+            }
+        return {
+            "origin": "COPR",
+            "badge_label": "COPR (RPM)",
+            "packager_detail": vendor or "Fedora COPR",
+        }
+
+    # 3. RPM Fusion
+    if "rpmfusion" in combined or "rpm fusion" in combined:
+        return {
+            "origin": "RPM Fusion",
+            "badge_label": "RPM Fusion (RPM)",
+            "packager_detail": vendor or packager or "RPM Fusion",
+        }
+
+    # 4. Nobara official packages (non-COPR or release tags)
+    if "nobara" in combined:
+        return {
+            "origin": "Nobara",
+            "badge_label": "Nobara (RPM)",
+            "packager_detail": vendor or packager or "Nobara Project",
+        }
+
+    # 5. Fedora Project upstream
+    if "fedora project" in v_lower or "red hat" in v_lower or "fedora project" in p_lower:
+        return {
+            "origin": "Fedora",
+            "badge_label": "Fedora (RPM)",
+            "packager_detail": "Fedora Project",
+        }
+
+    # 6. Fallback
+    fallback_name = vendor if vendor else (distro_name if distro_name else "Repo")
+    detail = []
+    if vendor:
+        detail.append(vendor)
+    if packager and packager != vendor:
+        detail.append(packager)
+    packager_detail = " — ".join(detail) if detail else f"{distro_name} Package"
+
+    return {
+        "origin": fallback_name,
+        "badge_label": f"{fallback_name} (RPM)",
+        "packager_detail": packager_detail,
+    }
 
 
 def get_distribution_info(os_release_path: Optional[str] = None) -> Dict[str, Any]:
@@ -747,6 +844,9 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         package_name = fname.replace(".desktop", "")
         package_version = ""
         package_arch = ""
+        package_vendor = ""
+        package_packager = ""
+        repo_origin = ""
         installed_size = ""
         uninstall_command = ""
         uninstall_note = ""
@@ -779,6 +879,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                 or (flatpak_id in flatpak_apps and flatpak_apps[flatpak_id]["installation"] == "user")
             )
             source_label = "Flatpak (User)" if is_user_install else "Flatpak (System)"
+            repo_origin = f"Flatpak ({'User' if is_user_install else 'System'})"
             package_name = flatpak_id
 
             if flatpak_id in flatpak_apps:
@@ -799,6 +900,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         elif "steam steam://rungameid/" in exec_cmd:
             source_type = "steam"
             source_label = "Steam Game"
+            repo_origin = "Steam Store"
             match = re.search(r"steam://rungameid/(\d+)", exec_cmd)
             steam_id = match.group(1) if match else "unknown"
             package_name = f"steam_{steam_id}"
@@ -818,6 +920,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         ):
             source_type = "appimage"
             source_label = "AppImage"
+            repo_origin = "Standalone AppImage"
             clean_exe = primary_exe.strip("\"'")
             if os.path.exists(clean_exe):
                 processed_appimage_paths.add(os.path.realpath(clean_exe))
@@ -838,6 +941,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         ):
             source_type = "web_app"
             source_label = "Web App (PWA)"
+            repo_origin = "Web Application (PWA)"
             package_name = fname.replace(".desktop", "")
             uninstall_command = f'rm -f "{path}"'
             uninstall_note = "Removes the web application desktop shortcut"
@@ -854,23 +958,41 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
 
             if pkg_info:
                 source_type = repo_source_type
-                source_label = repo_source_label
                 package_name = pkg_info["name"]
                 package_version = pkg_info["version"]
                 package_arch = pkg_info["arch"]
+                package_vendor = pkg_info.get("vendor", "")
+                package_packager = pkg_info.get("packager", "")
+                package_release = pkg_info.get("release", "")
+                package_buildhost = pkg_info.get("buildhost", "")
                 installed_size = pkg_info.get("size", "")
                 install_time = pkg_info.get("install_time", 0.0)
                 install_date = pkg_info.get("install_date", "")
                 uninstall_command = f"{uninstall_prefix} {package_name}"
                 uninstall_note = f"Customized local menu entry overriding system package {package_name}"
                 is_override = True
+
+                if pkg_type == "rpm":
+                    origin_info = resolve_rpm_origin(
+                        package_vendor,
+                        package_packager,
+                        package_buildhost,
+                        package_release,
+                        distro_name,
+                    )
+                    source_label = origin_info["badge_label"]
+                    repo_origin = origin_info["packager_detail"]
+                else:
+                    source_label = repo_source_label
+                    repo_origin = package_vendor or package_packager or repo_source_label
             else:
                 source_type = "local_tool"
-                source_label = "Local Tool / Script"
+                source_label = "Local App"
+                repo_origin = "Local Application (~/.local/share/applications)"
                 package_name = fname.replace(".desktop", "")
                 uninstall_command = f'rm -f "{path}"'
                 uninstall_note = "Removes the local desktop shortcut"
-                data["primary_category"] = "Local Tools"
+                data["primary_category"] = "Local Apps"
                 if os.path.exists(path):
                     install_time = os.path.getmtime(path)
                     install_date = format_timestamp(install_time)
@@ -879,19 +1001,37 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         elif path in file_to_pkg:
             pkg_info = file_to_pkg[path]
             source_type = repo_source_type
-            source_label = repo_source_label
             package_name = pkg_info["name"]
             package_version = pkg_info["version"]
             package_arch = pkg_info["arch"]
+            package_vendor = pkg_info.get("vendor", "")
+            package_packager = pkg_info.get("packager", "")
+            package_release = pkg_info.get("release", "")
+            package_buildhost = pkg_info.get("buildhost", "")
             installed_size = pkg_info.get("size", "")
             install_time = pkg_info.get("install_time", 0.0)
             install_date = pkg_info.get("install_date", "")
             uninstall_command = f"{uninstall_prefix} {package_name}"
             uninstall_note = f"Standard system package via {pkg_label}"
 
+            if pkg_type == "rpm":
+                origin_info = resolve_rpm_origin(
+                    package_vendor,
+                    package_packager,
+                    package_buildhost,
+                    package_release,
+                    distro_name,
+                )
+                source_label = origin_info["badge_label"]
+                repo_origin = origin_info["packager_detail"]
+            else:
+                source_label = repo_source_label
+                repo_origin = package_vendor or package_packager or repo_source_label
+
         else:
             source_type = "unmanaged"
             source_label = "Unmanaged"
+            repo_origin = "Unmanaged System Launcher"
             package_name = fname.replace(".desktop", "")
             uninstall_command = f'sudo rm -f "{path}"'
             uninstall_note = "Manually created system desktop entry"
@@ -939,6 +1079,9 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                 "package_name": package_name,
                 "package_version": package_version,
                 "package_arch": package_arch,
+                "package_vendor": package_vendor,
+                "package_packager": package_packager,
+                "repo_origin": repo_origin,
                 "installed_size": installed_size,
                 "uninstall_command": uninstall_command,
                 "uninstall_note": uninstall_note,
@@ -997,6 +1140,9 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                             "package_name": item,
                             "package_version": "",
                             "package_arch": "",
+                            "package_vendor": "",
+                            "package_packager": "",
+                            "repo_origin": "Standalone Binary",
                             "installed_size": format_bytes(sz),
                             "uninstall_command": f'rm -f "{app_path}"',
                             "uninstall_note": "Deletes the standalone application binary",
