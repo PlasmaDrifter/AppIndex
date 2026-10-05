@@ -30,8 +30,9 @@ except ImportError:
     Image = None
 
 from scanner import scan_all_applications
+from usage_tracker import start_background_usage_sync
 
-APP_VERSION = "0.4.4"
+APP_VERSION = "0.4.5"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -164,7 +165,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.4.4"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.4.5"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -590,12 +591,14 @@ async def get_apps(recent_hours: int = Query(48, ge=1, le=8760)):
 @app.post("/api/refresh")
 async def refresh_apps(recent_hours: int = Query(48, ge=1, le=8760)):
     """Force re-scan of the system applications."""
+    start_background_usage_sync()
     return get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
 
 
 @app.post("/api/scan")
 async def scan_apps_alias(recent_hours: int = Query(48, ge=1, le=8760)):
     """Alias for /api/refresh for CLI compat."""
+    start_background_usage_sync()
     return get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
 
 
@@ -767,6 +770,7 @@ if os.path.isdir(STATIC_DIR):
 
 def start_server(host: str = "127.0.0.1", port: int = 8765):
     """Start the Uvicorn web server."""
+    start_background_usage_sync()
     # Pre-warm cache on startup
     get_cached_or_scan()
     uvicorn.run(app, host=host, port=port, log_level="info")

@@ -21,6 +21,8 @@ try:
 except ImportError:
     HAS_RPM_LIB = False
 
+from usage_tracker import get_app_usage_metrics
+
 
 # Desktop directories to inspect in order of priority
 DESKTOP_DIRS = [
@@ -753,6 +755,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         install_date = ""
         version_transition = ""
         update_action = ""
+        steam_id = ""
 
         # Check if Flatpak (either direct in flatpak exports or shadowing a flatpak export)
         flatpak_id = None
@@ -907,6 +910,13 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         if is_recent_update and not update_action:
             update_action = "Updated"
 
+        last_used_time, last_used_date, launch_count = get_app_usage_metrics(
+            package_name=package_name,
+            desktop_filename=fname,
+            exec_cmd=exec_cmd,
+            steam_id=steam_id if source_type == "steam" else "",
+        )
+
         app_id = f"{scope}:{fname}"
         applications.append(
             {
@@ -938,6 +948,9 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                 "version_transition": version_transition,
                 "update_action": update_action,
                 "is_recent_update": is_recent_update,
+                "last_used_time": last_used_time,
+                "last_used_date": last_used_date,
+                "launch_count": launch_count,
             }
         )
 
@@ -958,6 +971,11 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                     sz = os.path.getsize(app_path)
                     app_mtime = os.path.getmtime(app_path)
                     is_recent = bool(app_mtime and app_mtime >= recent_cutoff)
+                    last_used_time, last_used_date, launch_count = get_app_usage_metrics(
+                        package_name=item,
+                        desktop_filename=item,
+                        exec_cmd=app_path,
+                    )
                     applications.append(
                         {
                             "id": f"standalone:{item}",
@@ -988,6 +1006,9 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                             "version_transition": "",
                             "update_action": "Updated" if is_recent else "",
                             "is_recent_update": is_recent,
+                            "last_used_time": last_used_time,
+                            "last_used_date": last_used_date,
+                            "launch_count": launch_count,
                         }
                     )
         except Exception:

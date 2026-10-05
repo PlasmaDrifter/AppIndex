@@ -32,7 +32,8 @@ class TestScanner(unittest.TestCase):
         required_fields = [
             "id", "name", "source_type", "source_label",
             "in_menu", "package_name", "uninstall_command",
-            "install_date", "is_recent_update"
+            "install_date", "is_recent_update",
+            "last_used_time", "last_used_date", "launch_count"
         ]
         for field in required_fields:
             self.assertIn(field, sample)
@@ -265,6 +266,21 @@ class TestVersionComparison(unittest.TestCase):
         data = res.json()
         self.assertIn("stats", data)
         self.assertEqual(data["stats"].get("recent_hours"), 72)
+
+
+class TestUsageTracker(unittest.TestCase):
+    def test_normalize_unit_name(self):
+        from usage_tracker import normalize_unit_name
+        self.assertEqual(normalize_unit_name("app-google\\x2dchrome@1234abcd.service"), "google-chrome")
+        self.assertEqual(normalize_unit_name("app-flatpak-org.mozilla.Firefox-12345.scope"), "org.mozilla.Firefox")
+        self.assertEqual(normalize_unit_name("app-org.kde.dolphin-999.scope"), "org.kde.dolphin")
+
+    def test_usage_metrics_return_types(self):
+        from usage_tracker import get_app_usage_metrics
+        last_time, last_date, count = get_app_usage_metrics("non_existent_pkg_xyz_123")
+        self.assertIsInstance(last_time, float)
+        self.assertIsInstance(last_date, str)
+        self.assertIsInstance(count, int)
 
 
 if __name__ == "__main__":

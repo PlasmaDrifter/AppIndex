@@ -92,13 +92,17 @@ body {
   font-family: var(--font-family);
   font-size: 14px;
   line-height: 1.5;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .app-layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 /* Header */
@@ -109,8 +113,7 @@ body {
   padding: 8px 24px;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 100;
 }
 
@@ -504,8 +507,12 @@ body {
 
 /* Main Content */
 .main-content {
-  padding: 12px 24px 36px;
+  padding: 12px 24px 16px;
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Toolbar */
@@ -516,6 +523,7 @@ body {
   gap: 12px;
   margin-bottom: 12px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .search-box {
@@ -706,6 +714,7 @@ body {
   margin-bottom: 12px;
   border-bottom: 1px solid var(--border-color);
   width: 100%;
+  flex-shrink: 0;
 }
 
 .filter-tabs-scroll,
@@ -806,6 +815,10 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 16px;
 }
 
 /* App Card - Compact Mode */
@@ -1186,10 +1199,14 @@ body {
 
 /* Table View */
 .table-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   overflow-x: auto;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
+  position: relative;
 }
 
 .apps-table {
@@ -1205,9 +1222,16 @@ body {
   width: 100%;
 }
 
+.apps-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-shrink: 0;
+}
+
 .apps-table tr {
   display: grid;
-  grid-template-columns: 22px 280px 150px 170px 170px minmax(220px, 1fr) 80px 70px;
+  grid-template-columns: 22px 280px 150px 170px 170px minmax(220px, 1fr) 150px 70px 70px;
   align-items: center;
   gap: 12px;
   padding: 0 14px;
@@ -1219,6 +1243,7 @@ body {
   background-color: var(--bg-card);
   border-bottom: 1px solid var(--border-color);
   min-height: 38px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .apps-table tbody tr {
@@ -1301,11 +1326,14 @@ body {
   white-space: nowrap;
 }
 
-.col-last-updated {
+.col-last-updated,
+.apps-table th.col-last-updated,
+.apps-table td.col-last-updated {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-start !important;
   justify-content: center;
+  text-align: left;
   white-space: nowrap;
   min-width: 0;
 }
@@ -1352,6 +1380,59 @@ body {
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+.col-usage,
+.apps-table th.col-usage,
+.apps-table td.col-usage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start !important;
+  justify-content: center;
+  text-align: left;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.table-usage-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.table-usage-date-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.table-usage-date {
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-usage-rel {
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.badge-usage {
+  font-size: calc(10px * var(--font-scale, 1));
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: var(--radius-full, 9999px);
+  background-color: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .col-menu-status {
@@ -2564,7 +2645,7 @@ body.density-spacious .app-icon {
 @media (max-width: 768px) {
   .top-nav { padding: 12px 16px; }
   .stats-container { padding: 16px 16px 8px; grid-template-columns: repeat(2, 1fr); }
-  .main-content { padding: 8px 16px 30px; }
+  .main-content { padding: 8px 16px 12px; }
   .apps-grid { grid-template-columns: 1fr; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .info-row { flex-direction: column; gap: 4px; }
