@@ -1258,8 +1258,9 @@ body {
 
 .apps-table th {
   font-size: calc(11px * var(--font-scale, 1));
-  font-weight: 600;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--accent-cyan);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
   line-height: 1.2;
