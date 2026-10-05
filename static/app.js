@@ -263,17 +263,17 @@ const COLOR_PICKER_MAP = [
   { inputId: "color-bg-card", hexId: "hex-bg-card", varName: "--bg-card" },
   { inputId: "color-border", hexId: "hex-border", varName: "--border-color" },
 
-  // Typography
-  { inputId: "color-text-primary", hexId: "hex-text-primary", varName: "--text-primary" },
-  { inputId: "color-text-secondary", hexId: "hex-text-secondary", varName: "--text-secondary" },
-  { inputId: "color-text-muted", hexId: "hex-text-muted", varName: "--text-muted" },
-
   // Interface Accents
   { inputId: "color-accent-blue", hexId: "hex-accent-blue", varName: "--accent-blue" },
   { inputId: "color-accent-purple", hexId: "hex-accent-purple", varName: "--accent-purple" },
   { inputId: "color-accent-green", hexId: "hex-accent-green", varName: "--accent-green" },
   { inputId: "color-accent-yellow", hexId: "hex-accent-yellow", varName: "--accent-yellow" },
   { inputId: "color-accent-orange", hexId: "hex-accent-orange", varName: "--accent-orange" },
+
+  // Typography
+  { inputId: "color-text-primary", hexId: "hex-text-primary", varName: "--text-primary" },
+  { inputId: "color-text-secondary", hexId: "hex-text-secondary", varName: "--text-secondary" },
+  { inputId: "color-text-muted", hexId: "hex-text-muted", varName: "--text-muted" },
 
   // Package Source Badges
   { inputId: "color-badge-rpm", hexId: "hex-badge-rpm", varName: "--badge-rpm-text" },

@@ -2353,9 +2353,6 @@ body.density-spacious .app-icon {
   min-width: 0;
 }
 
-.color-picker-item.span-2col {
-  grid-column: 1 / -1;
-}
 
 .color-picker-item label {
   font-size: 11px;
