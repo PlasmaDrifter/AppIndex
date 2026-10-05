@@ -556,14 +556,14 @@ body {
 
 .search-box {
   position: relative;
-  width: 395px;
+  width: 362px;
   min-width: 240px;
-  flex: 0 1 395px;
+  flex: 0 1 362px;
 }
 
 .search-icon {
   position: absolute;
-  left: 12px;
+  left: 11px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
@@ -571,14 +571,18 @@ body {
 
 .search-box input {
   width: 100%;
-  padding: 8px 38px 8px 38px;
+  padding: 8px 10px 8px 34px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 13.5px;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, padding 0.15s ease;
+}
+
+.search-box input:not(:placeholder-shown) {
+  padding-right: 32px;
 }
 
 .search-box input:focus {
