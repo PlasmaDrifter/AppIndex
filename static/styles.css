@@ -556,9 +556,9 @@ body {
 
 .search-box {
   position: relative;
-  width: 420px;
+  width: 395px;
   min-width: 240px;
-  flex: 0 1 420px;
+  flex: 0 1 395px;
 }
 
 .search-icon {
