@@ -145,29 +145,7 @@ python3 server.py --host 127.0.0.1 --port 8765
 
 ---
 
-## Command-Line & Desktop Launcher Setup
-
-AppIndex comes with an included portable launcher script (`appindex.sh`). You can symlink it to your personal `~/.local/bin` directory (or any directory in your `$PATH`):
-
-```bash
-# Link the launcher into ~/.local/bin
-mkdir -p ~/.local/bin
-ln -sf "$(pwd)/appindex.sh" ~/.local/bin/appindex
-```
-
-The script supports standard commands:
-```bash
-appindex          # Ensure server is running and open in browser (default)
-appindex start    # Start server in background if not running
-appindex stop     # Stop the background server
-appindex restart  # Restart the server with fresh code/settings
-appindex open     # Open browser to http://localhost:8765
-appindex status   # Check server health
-appindex scan     # Trigger a fresh rescan via API
-appindex update   # Automatically update AppIndex to latest release and restart
-```
-
-### Desktop Menu Entry
+## Desktop Menu Entry
 
 To integrate AppIndex into your application launcher (KDE, GNOME, XFCE, etc.), create `~/.local/share/applications/appindex.desktop`:
 
@@ -177,14 +155,12 @@ Type=Application
 Name=AppIndex
 GenericName=Linux Application & Package Inventory
 Comment=Inspect installed applications, package managers, and uninstall commands
-Exec=appindex
+Exec=xdg-open http://localhost:8765
 Icon=utilities-terminal
 Terminal=false
 Categories=Utility;System;
 Keywords=apps;packages;inventory;uninstall;flatpak;appimage;rpm;pacman;apt;steam;pwa;
 ```
-
-*(Note: If you did not symlink `appindex` to `~/.local/bin`, set `Exec` to the absolute path of `appindex.sh` in your clone directory, e.g., `Exec=/path/to/AppIndex/appindex.sh launch`)*
 
 ---
 
