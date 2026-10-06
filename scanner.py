@@ -318,7 +318,7 @@ def resolve_rpm_origin(
     combined = f"{v_lower} {p_lower} {(buildhost or '').lower()} {(release or '').lower()}"
 
     # 1. Terra Repository (Fyra Labs)
-    if "terra" in v_lower or "terra" in p_lower or "fyralabs.com" in p_lower or "fyralabs" in v_lower:
+    if "terra" in combined or "fyralabs" in combined:
         packager_info = packager if packager else "Fyra Labs"
         return {
             "origin": "Terra",

@@ -1183,7 +1183,7 @@ function renderCards(apps) {
               <span class="badge ${badgeClass}">${escapeHtml(app.source_label)}</span>
               <span class="badge ${menuBadgeClass}">${menuBadgeText}</span>
               ${app.primary_category ? `<span class="badge badge-unmanaged">${escapeHtml(app.primary_category)}</span>` : ""}
-              ${app.is_recent_update ? `<span class="badge badge-recent-update" title="Updated within last 48 hours">Recently Updated</span>` : ""}
+              ${app.is_recent_update ? `<span class="badge badge-recent-update" title="Updated within last 48 hours">Updated</span>` : ""}
             </div>
           </div>
         </div>
@@ -1312,7 +1312,7 @@ function renderTable(apps) {
       <td class="col-app-name">
         <div class="table-app-title-row">
           <strong class="table-app-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</strong>
-          ${app.is_recent_update ? `<span class="badge badge-recent-update" style="font-size: 9px; padding: 1px 5px; flex-shrink: 0;" title="Updated within last 48 hours">Recent</span>` : ""}
+          ${app.is_recent_update ? `<span class="badge badge-recent-update" style="font-size: 9px; padding: 1px 5px; flex-shrink: 0;" title="Updated within last 48 hours">Updated</span>` : ""}
         </div>
         <div class="table-app-generic" title="${escapeHtml(app.generic_name || app.comment || "")}">${escapeHtml(app.generic_name || app.comment || "")}</div>
       </td>
