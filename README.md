@@ -218,24 +218,6 @@ systemctl --user daemon-reload
 systemctl --user enable --now appindex.service
 ```
 
----
-
-## REST API Reference
-
-| Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `/api/apps` | `GET` | Returns list of all scanned applications, package metadata, and summary stats |
-| `/api/status` | `GET` | Health check and current application version endpoint |
-| `/api/icon?name=<name>&path=<path>` | `GET`, `HEAD` | Resolves and serves application icons with 24-hour browser caching |
-| `/api/desktop-content?path=<path>` | `GET` | Returns raw text content of an authorized local `.desktop` file |
-| `/api/refresh` | `POST` | Invalidates in-memory caches and triggers an immediate full system rescan |
-| `/api/export?format=csv\|json&...` | `GET` | Downloads catalog as CSV or JSON with optional field, source, and visibility filters |
-| `/api/check-update?force=1` | `GET` | Queries GitHub API for the latest release tag |
-| `/api/apply-update` | `POST` | Initiates automatic in-place update via git or release tarball and restarts the server |
-| `/favicon.ico` | `GET`, `HEAD` | Serves application favicon |
-
----
-
 ## Running Tests
 
 AppIndex includes a unit and integration test suite:
