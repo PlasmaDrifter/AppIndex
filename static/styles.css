@@ -1131,6 +1131,7 @@ body {
 .badge-source-repo_rpm,
 .badge-source-repo_pacman,
 .badge-source-repo_apt,
+.badge-source-repo_dpkg,
 .badge-source-repo_system {
   background-color: var(--badge-rpm-bg);
   border: 1px solid var(--badge-rpm-border);
@@ -2366,31 +2367,43 @@ body.density-spacious .app-icon {
 .color-input-wrapper {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 3px 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.color-input-wrapper input[type="color"] {
-  -webkit-appearance: none;
-  border: none;
+.color-input-wrapper:hover {
+  border-color: var(--accent-blue);
+  background-color: var(--bg-card-hover);
+}
+
+.color-input-wrapper.active {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-blue) 35%, transparent);
+}
+
+.swatch-preview {
   width: 20px;
   height: 20px;
-  border-radius: 3px;
-  cursor: pointer;
-  background: none;
-  padding: 0;
-}
-
-.color-input-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-input-wrapper input[type="color"]::-webkit-color-swatch {
+  border-radius: 4px;
   border: 1px solid var(--border-color);
-  border-radius: 2px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s ease;
+}
+
+.color-input-wrapper:hover .swatch-preview {
+  transform: scale(1.08);
 }
 
 .color-hex {
@@ -2398,6 +2411,213 @@ body.density-spacious .app-icon {
   font-size: 11px;
   color: var(--text-primary);
   text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* In-App Bidirectional Shade Color Picker Popover */
+#appindex-color-popover.custom-color-panel {
+  position: fixed;
+  z-index: 99999;
+  width: 340px;
+  background-color: var(--bg-modal, #24273a);
+  border: 1px solid var(--border-color, #363a4f);
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 1px rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  animation: popoverFadeIn 0.15s ease;
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+#appindex-color-popover.hidden {
+  display: none !important;
+}
+
+.color-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  padding-bottom: 8px;
+}
+
+.color-popover-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.color-popover-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-popover-btn {
+  background: none;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  line-height: 1.2;
+}
+
+.color-popover-cancel {
+  color: var(--text-muted);
+  border-color: var(--border-color, #363a4f);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.color-popover-cancel:hover {
+  color: var(--accent-red, #ed8796);
+  border-color: var(--accent-red, #ed8796);
+  background-color: rgba(237, 135, 150, 0.1);
+}
+
+.color-popover-done {
+  color: #181926;
+  background-color: var(--accent-blue, #8aadf4);
+  border-color: var(--accent-blue, #8aadf4);
+}
+
+.color-popover-done:hover {
+  filter: brightness(1.1);
+}
+
+/* Base Color Chips */
+.custom-chips-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.color-chip {
+  flex: 1;
+  height: 25px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  padding: 0;
+  outline: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.color-chip:hover {
+  transform: translateY(-2px) scale(1.12);
+  box-shadow: 0 0 0 1.5px #ffffff, 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.color-chip.active {
+  box-shadow: 0 0 0 2.5px #ffffff, 0 0 8px rgba(0, 0, 0, 0.8);
+  transform: scale(1.1);
+}
+
+/* Bottom Controls Row: Preview, Shade Slider, Hex Input */
+.picker-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.custom-preview-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background-color: var(--accent-blue);
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+}
+
+.shade-slider-track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.shade-slider {
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: linear-gradient(to right, #000000 0%, #8aadf4 50%, #ffffff 100%);
+  outline: none;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.shade-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #18181b;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+.shade-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #18181b;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+.custom-hex-box {
+  display: flex;
+  align-items: center;
+  background: var(--bg-primary, #181926);
+  border: 1px solid var(--border-color, #363a4f);
+  border-radius: 5px;
+  padding: 4px 8px;
+  width: 80px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.custom-hex-prefix {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  margin-right: 3px;
+}
+
+.custom-hex-input {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  width: 100%;
+  outline: none;
+  text-transform: uppercase;
+  padding: 0;
 }
 
 /* Save Custom Theme */

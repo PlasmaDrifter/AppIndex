@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="darkreader-lock">
   <title>AppIndex</title>
   <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon.png">
@@ -26,7 +27,7 @@
         </div>
         <div class="brand-text">
           <h1>AppIndex</h1>
-          <span class="brand-version" id="brand-app-version">v0.5.1</span>
+          <span class="brand-version" id="brand-app-version">v0.5.2</span>
         </div>
       </div>
 
@@ -78,7 +79,7 @@
            rel="noopener noreferrer"
            class="btn btn-secondary btn-sm nav-github-btn"
            id="nav-github-link"
-           title="GitHub Repository (v0.5.1)">
+           title="GitHub Repository (v0.5.2)">
           <svg class="nav-github-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
           </svg>
@@ -373,7 +374,7 @@
             <div>
               <div class="settings-title-row">
                 <h2>Application Settings</h2>
-                <span class="settings-version-tag" id="settings-app-version">v0.5.1</span>
+                <span class="settings-version-tag" id="settings-app-version">v0.5.2</span>
               </div>
               <span class="modal-subtitle">Customize themes, view density, and typography scaling</span>
             </div>
@@ -467,32 +468,36 @@
                   <div class="color-picker-category-title">Core Surfaces &amp; Borders</div>
                   <div class="color-pickers-grid">
                     <div class="color-picker-item">
-                      <label for="color-bg-primary">App Background</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-bg-primary" value="#181926">
+                      <label>App Background</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-bg-primary" data-var="--bg-primary" data-label="App Background" title="Pick App Background color">
+                        <span class="swatch-preview" id="preview-color-bg-primary" style="background-color: #181926;"></span>
                         <span class="color-hex" id="hex-bg-primary">#181926</span>
-                      </div>
+                        <input type="hidden" id="color-bg-primary" value="#181926">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-bg-secondary">Bar &amp; Surface</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-bg-secondary" value="#1e2030">
+                      <label>Bar &amp; Surface</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-bg-secondary" data-var="--bg-secondary" data-label="Bar &amp; Surface" title="Pick Bar &amp; Surface color">
+                        <span class="swatch-preview" id="preview-color-bg-secondary" style="background-color: #1e2030;"></span>
                         <span class="color-hex" id="hex-bg-secondary">#1e2030</span>
-                      </div>
+                        <input type="hidden" id="color-bg-secondary" value="#1e2030">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-bg-card">Card / Header</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-bg-card" value="#24273a">
+                      <label>Card / Header</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-bg-card" data-var="--bg-card" data-label="Card / Header" title="Pick Card / Header color">
+                        <span class="swatch-preview" id="preview-color-bg-card" style="background-color: #24273a;"></span>
                         <span class="color-hex" id="hex-bg-card">#24273a</span>
-                      </div>
+                        <input type="hidden" id="color-bg-card" value="#24273a">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-border">Border Color</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-border" value="#363a4f">
+                      <label>Border Color</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-border" data-var="--border-color" data-label="Border Color" title="Pick Border Color">
+                        <span class="swatch-preview" id="preview-color-border" style="background-color: #363a4f;"></span>
                         <span class="color-hex" id="hex-border">#363a4f</span>
-                      </div>
+                        <input type="hidden" id="color-border" value="#363a4f">
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -502,39 +507,44 @@
                   <div class="color-picker-category-title">Interface Accents</div>
                   <div class="color-pickers-grid">
                     <div class="color-picker-item">
-                      <label for="color-accent-blue">Primary Accent (Tabs)</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-accent-blue" value="#8aadf4">
+                      <label>Primary Accent (Tabs)</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-accent-blue" data-var="--accent-blue" data-label="Primary Accent (Tabs)" title="Pick Primary Accent color">
+                        <span class="swatch-preview" id="preview-color-accent-blue" style="background-color: #8aadf4;"></span>
                         <span class="color-hex" id="hex-accent-blue">#8aadf4</span>
-                      </div>
+                        <input type="hidden" id="color-accent-blue" value="#8aadf4">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-accent-purple">Secondary Accent</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-accent-purple" value="#c6a0f6">
+                      <label>Secondary Accent</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-accent-purple" data-var="--accent-purple" data-label="Secondary Accent" title="Pick Secondary Accent color">
+                        <span class="swatch-preview" id="preview-color-accent-purple" style="background-color: #c6a0f6;"></span>
                         <span class="color-hex" id="hex-accent-purple">#c6a0f6</span>
-                      </div>
+                        <input type="hidden" id="color-accent-purple" value="#c6a0f6">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-accent-green">Recent Updates</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-accent-green" value="#a6da95">
+                      <label>Recent Updates</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-accent-green" data-var="--accent-green" data-label="Recent Updates" title="Pick Recent Updates color">
+                        <span class="swatch-preview" id="preview-color-accent-green" style="background-color: #a6da95;"></span>
                         <span class="color-hex" id="hex-accent-green">#a6da95</span>
-                      </div>
+                        <input type="hidden" id="color-accent-green" value="#a6da95">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-accent-yellow">Export Button</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-accent-yellow" value="#eed49f">
+                      <label>Export Button</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-accent-yellow" data-var="--accent-yellow" data-label="Export Button" title="Pick Export Button color">
+                        <span class="swatch-preview" id="preview-color-accent-yellow" style="background-color: #eed49f;"></span>
                         <span class="color-hex" id="hex-accent-yellow">#eed49f</span>
-                      </div>
+                        <input type="hidden" id="color-accent-yellow" value="#eed49f">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-accent-orange">Alert &amp; Warning</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-accent-orange" value="#f5a97f">
+                      <label>Alert &amp; Warning</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-accent-orange" data-var="--accent-orange" data-label="Alert &amp; Warning" title="Pick Alert &amp; Warning color">
+                        <span class="swatch-preview" id="preview-color-accent-orange" style="background-color: #f5a97f;"></span>
                         <span class="color-hex" id="hex-accent-orange">#f5a97f</span>
-                      </div>
+                        <input type="hidden" id="color-accent-orange" value="#f5a97f">
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -547,25 +557,28 @@
                   <div class="color-picker-category-title">Typography</div>
                   <div class="color-pickers-grid">
                     <div class="color-picker-item">
-                      <label for="color-text-primary">Primary Text</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-text-primary" value="#cad3f5">
+                      <label>Primary Text</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-text-primary" data-var="--text-primary" data-label="Primary Text" title="Pick Primary Text color">
+                        <span class="swatch-preview" id="preview-color-text-primary" style="background-color: #cad3f5;"></span>
                         <span class="color-hex" id="hex-text-primary">#cad3f5</span>
-                      </div>
+                        <input type="hidden" id="color-text-primary" value="#cad3f5">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-text-secondary">Secondary &amp; Code</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-text-secondary" value="#a5adcb">
+                      <label>Secondary &amp; Code</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-text-secondary" data-var="--text-secondary" data-label="Secondary &amp; Code" title="Pick Secondary &amp; Code color">
+                        <span class="swatch-preview" id="preview-color-text-secondary" style="background-color: #a5adcb;"></span>
                         <span class="color-hex" id="hex-text-secondary">#a5adcb</span>
-                      </div>
+                        <input type="hidden" id="color-text-secondary" value="#a5adcb">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-text-muted">Muted Text</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-text-muted" value="#8087a2">
+                      <label>Muted Text</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-text-muted" data-var="--text-muted" data-label="Muted Text" title="Pick Muted Text color">
+                        <span class="swatch-preview" id="preview-color-text-muted" style="background-color: #8087a2;"></span>
                         <span class="color-hex" id="hex-text-muted">#8087a2</span>
-                      </div>
+                        <input type="hidden" id="color-text-muted" value="#8087a2">
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -575,46 +588,52 @@
                   <div class="color-picker-category-title">Package Source Badges</div>
                   <div class="color-pickers-grid">
                     <div class="color-picker-item">
-                      <label for="color-badge-rpm">Repo (RPM)</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-badge-rpm" value="#8aadf4">
+                      <label>Repo (RPM)</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-badge-rpm" data-var="--badge-rpm-text" data-label="Repo (RPM)" title="Pick Repo (RPM) color">
+                        <span class="swatch-preview" id="preview-color-badge-rpm" style="background-color: #8aadf4;"></span>
                         <span class="color-hex" id="hex-badge-rpm">#8aadf4</span>
-                      </div>
+                        <input type="hidden" id="color-badge-rpm" value="#8aadf4">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-badge-flatpak">Flatpak</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-badge-flatpak" value="#ee99a0">
+                      <label>Flatpak</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-badge-flatpak" data-var="--badge-flatpak-text" data-label="Flatpak" title="Pick Flatpak color">
+                        <span class="swatch-preview" id="preview-color-badge-flatpak" style="background-color: #ee99a0;"></span>
                         <span class="color-hex" id="hex-badge-flatpak">#ee99a0</span>
-                      </div>
+                        <input type="hidden" id="color-badge-flatpak" value="#ee99a0">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-badge-local">Local Apps</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-badge-local" value="#eed49f">
+                      <label>Local Apps</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-badge-local" data-var="--badge-local-text" data-label="Local Apps" title="Pick Local Apps color">
+                        <span class="swatch-preview" id="preview-color-badge-local" style="background-color: #eed49f;"></span>
                         <span class="color-hex" id="hex-badge-local">#eed49f</span>
-                      </div>
+                        <input type="hidden" id="color-badge-local" value="#eed49f">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-badge-appimage">AppImage</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-badge-appimage" value="#f5a97f">
+                      <label>AppImage</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-badge-appimage" data-var="--badge-appimage-text" data-label="AppImage" title="Pick AppImage color">
+                        <span class="swatch-preview" id="preview-color-badge-appimage" style="background-color: #f5a97f;"></span>
                         <span class="color-hex" id="hex-badge-appimage">#f5a97f</span>
-                      </div>
+                        <input type="hidden" id="color-badge-appimage" value="#f5a97f">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-badge-steam">Steam</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-badge-steam" value="#c6a0f6">
+                      <label>Steam</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-badge-steam" data-var="--badge-steam-text" data-label="Steam" title="Pick Steam color">
+                        <span class="swatch-preview" id="preview-color-badge-steam" style="background-color: #c6a0f6;"></span>
                         <span class="color-hex" id="hex-badge-steam">#c6a0f6</span>
-                      </div>
+                        <input type="hidden" id="color-badge-steam" value="#c6a0f6">
+                      </button>
                     </div>
                     <div class="color-picker-item">
-                      <label for="color-badge-unmanaged">Unmanaged</label>
-                      <div class="color-input-wrapper">
-                        <input type="color" id="color-badge-unmanaged" value="#b8c0e0">
+                      <label>Unmanaged</label>
+                      <button type="button" class="color-input-wrapper swatch-btn" data-input-id="color-badge-unmanaged" data-var="--badge-unmanaged-text" data-label="Unmanaged" title="Pick Unmanaged color">
+                        <span class="swatch-preview" id="preview-color-badge-unmanaged" style="background-color: #b8c0e0;"></span>
                         <span class="color-hex" id="hex-badge-unmanaged">#b8c0e0</span>
-                      </div>
+                        <input type="hidden" id="color-badge-unmanaged" value="#b8c0e0">
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -762,6 +781,42 @@
           </div>
         </div>
 
+        <!-- In-App Bidirectional Shade Color Picker Popover -->
+        <div id="appindex-color-popover" class="custom-color-panel hidden" role="dialog" aria-label="Color Picker">
+          <div class="color-popover-header">
+            <span class="color-popover-title" id="colorPopoverTitle">App Background</span>
+            <div class="color-popover-header-actions">
+              <button type="button" class="color-popover-btn color-popover-cancel" id="colorPopoverCancel" title="Revert to original color and close">Cancel</button>
+              <button type="button" class="color-popover-btn color-popover-done" id="colorPopoverDone" title="Keep color and close">Done</button>
+            </div>
+          </div>
+          <!-- Row 1: Base Color Chips -->
+          <div class="custom-chips-row">
+            <button type="button" class="color-chip" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></button>
+            <button type="button" class="color-chip" data-color="#f97316" style="background-color: #f97316;" title="Orange"></button>
+            <button type="button" class="color-chip" data-color="#eab308" style="background-color: #eab308;" title="Yellow"></button>
+            <button type="button" class="color-chip" data-color="#84cc16" style="background-color: #84cc16;" title="Lime"></button>
+            <button type="button" class="color-chip" data-color="#22c55e" style="background-color: #22c55e;" title="Green"></button>
+            <button type="button" class="color-chip" data-color="#06b6d4" style="background-color: #06b6d4;" title="Cyan"></button>
+            <button type="button" class="color-chip" data-color="#3b82f6" style="background-color: #3b82f6;" title="Blue"></button>
+            <button type="button" class="color-chip" data-color="#9146ff" style="background-color: #9146ff;" title="Purple"></button>
+            <button type="button" class="color-chip" data-color="#ec4899" style="background-color: #ec4899;" title="Pink"></button>
+            <button type="button" class="color-chip" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
+          </div>
+
+          <!-- Row 2: Preview Dot, Bidirectional Shade Slider, and Hex Code Input -->
+          <div class="picker-bottom-row">
+            <span class="custom-preview-dot" id="pickerPreviewDot" title="Current shade preview"></span>
+            <div class="shade-slider-track">
+              <input type="range" id="customShadeSlider" min="0" max="100" value="50" class="shade-slider" title="Drag left for darker shades, right for lighter shades">
+            </div>
+            <div class="custom-hex-box">
+              <span class="custom-hex-prefix">#</span>
+              <input type="text" id="customHexInput" class="custom-hex-input" maxlength="6" placeholder="8AADF4" spellcheck="false" title="Hex code">
+            </div>
+          </div>
+        </div>
+
         <div class="modal-footer">
           <button id="settings-done-btn" class="btn btn-primary">Done</button>
         </div>
@@ -831,7 +886,7 @@
             </div>
             <div class="export-checkbox-grid" id="export-sources-grid">
               <label class="export-check-item">
-                <input type="checkbox" name="export-source" value="repo_rpm,repo_pacman,repo_apt" checked>
+                <input type="checkbox" name="export-source" value="repo_rpm,repo_pacman,repo_apt,repo_dpkg" checked>
                 <span>Native Repositories</span>
               </label>
               <label class="export-check-item">

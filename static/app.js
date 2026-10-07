@@ -1875,6 +1875,237 @@ function applyFontScale(scaleVal) {
   requestAnimationFrame(() => updateSlidingPill(null, false));
 }
 
+let activeColorPicker = {
+  activeButton: null,
+  inputId: null,
+  varName: null,
+  originalColor: "#8AADF4",
+  baseColor: "#8AADF4",
+  currentColor: "#8AADF4",
+  shade: 50
+};
+
+function initInAppColorPicker() {
+  const popover = document.getElementById("appindex-color-popover");
+  const cancelBtn = document.getElementById("colorPopoverCancel");
+  const doneBtn = document.getElementById("colorPopoverDone");
+  const titleEl = document.getElementById("colorPopoverTitle");
+  const previewDot = document.getElementById("pickerPreviewDot");
+  const slider = document.getElementById("customShadeSlider");
+  const hexInput = document.getElementById("customHexInput");
+  const chips = popover ? popover.querySelectorAll(".color-chip") : [];
+
+  if (!popover) return;
+
+  function closePopover() {
+    popover.classList.add("hidden");
+    if (activeColorPicker.activeButton) {
+      activeColorPicker.activeButton.classList.remove("active");
+      activeColorPicker.activeButton = null;
+    }
+  }
+
+  function cancelAndRevert() {
+    if (activeColorPicker.originalColor) {
+      applyActiveColor(activeColorPicker.originalColor, activeColorPicker.originalColor, 50);
+    }
+    closePopover();
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", cancelAndRevert);
+  }
+
+  if (doneBtn) {
+    doneBtn.addEventListener("click", closePopover);
+  }
+
+  function openPopover(btn) {
+    if (activeColorPicker.activeButton) {
+      activeColorPicker.activeButton.classList.remove("active");
+    }
+
+    activeColorPicker.activeButton = btn;
+    btn.classList.add("active");
+
+    const inputId = btn.dataset.inputId;
+    const varName = btn.dataset.var;
+    const label = btn.dataset.label || "Color Picker";
+    const input = document.getElementById(inputId);
+
+    let currentVal = input ? input.value : "";
+    if (!currentVal) {
+      currentVal = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    }
+    currentVal = normalizeHex(currentVal);
+
+    activeColorPicker.inputId = inputId;
+    activeColorPicker.varName = varName;
+    activeColorPicker.originalColor = currentVal;
+    activeColorPicker.baseColor = currentVal;
+    activeColorPicker.currentColor = currentVal;
+    activeColorPicker.shade = 50;
+
+    if (titleEl) titleEl.textContent = label;
+    if (previewDot) previewDot.style.backgroundColor = currentVal;
+    if (slider) {
+      slider.value = 50;
+      slider.style.background = `linear-gradient(to right, #000000 0%, ${currentVal} 50%, #ffffff 100%)`;
+    }
+    if (hexInput) hexInput.value = currentVal.replace(/^#/, "").toUpperCase();
+
+    // Sync active chip
+    const cleanLower = currentVal.toLowerCase();
+    chips.forEach((c) => {
+      c.classList.toggle("active", (c.dataset.color || "").toLowerCase() === cleanLower);
+    });
+
+    // Anchor popover to button using getBoundingClientRect()
+    popover.classList.remove("hidden");
+    const rect = btn.getBoundingClientRect();
+    const popoverWidth = 340;
+    const popoverHeight = 130;
+
+    let left = rect.left;
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = window.innerWidth - popoverWidth - 12;
+    }
+    if (left < 12) left = 12;
+
+    let top = rect.bottom + 6;
+    if (top + popoverHeight > window.innerHeight - 12) {
+      top = Math.max(12, rect.top - popoverHeight - 6);
+    }
+
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+  }
+
+  function applyActiveColor(newHex, baseColor, shadeVal) {
+    const cleanHex = normalizeHex(newHex);
+    activeColorPicker.currentColor = cleanHex;
+    if (baseColor) activeColorPicker.baseColor = normalizeHex(baseColor);
+    if (shadeVal !== undefined) activeColorPicker.shade = shadeVal;
+
+    // Update popover UI
+    if (previewDot) previewDot.style.backgroundColor = cleanHex;
+    if (hexInput && document.activeElement !== hexInput) {
+      hexInput.value = cleanHex.replace(/^#/, "").toUpperCase();
+    }
+    if (slider && baseColor) {
+      slider.style.background = `linear-gradient(to right, #000000 0%, ${normalizeHex(baseColor)} 50%, #ffffff 100%)`;
+      if (document.activeElement !== slider && shadeVal !== undefined) {
+        slider.value = shadeVal;
+      }
+    }
+
+    // Update target swatch in Theme Builder
+    if (activeColorPicker.inputId) {
+      const targetInput = document.getElementById(activeColorPicker.inputId);
+      const hexSpanId = "hex-" + activeColorPicker.inputId.replace("color-", "");
+      const targetHex = document.getElementById(hexSpanId);
+      const targetPreview = document.getElementById("preview-" + activeColorPicker.inputId);
+
+      if (targetInput) targetInput.value = cleanHex;
+      if (targetHex) targetHex.textContent = cleanHex.toUpperCase();
+      if (targetPreview) targetPreview.style.backgroundColor = cleanHex;
+    }
+
+    // Apply live to :root and settings
+    if (activeColorPicker.varName) {
+      document.documentElement.style.setProperty(activeColorPicker.varName, cleanHex);
+      if (activeColorPicker.varName === "--bg-card") {
+        document.documentElement.style.setProperty("--bg-card-hover", cleanHex);
+      }
+      if (!userSettings.customColors) {
+        userSettings.customColors = {};
+      }
+      userSettings.customColors[activeColorPicker.varName] = cleanHex;
+      userSettings.themeId = "custom";
+      saveSettingsToStorage();
+
+      const presetsGrid = document.getElementById("theme-presets-grid");
+      if (presetsGrid) {
+        presetsGrid.querySelectorAll(".theme-preset-card").forEach((c) => c.classList.remove("active"));
+      }
+    }
+  }
+
+  // Bind swatch buttons
+  document.querySelectorAll(".swatch-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (activeColorPicker.activeButton === btn && !popover.classList.contains("hidden")) {
+        closePopover();
+      } else {
+        openPopover(btn);
+      }
+    });
+  });
+
+  // Base chips click
+  chips.forEach((chip) => {
+    chip.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const col = chip.dataset.color;
+      chips.forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      applyActiveColor(col, col, 50);
+    });
+  });
+
+  // Shade slider input
+  if (slider) {
+    slider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      const shaded = computeShade(activeColorPicker.baseColor, val);
+      applyActiveColor(shaded, activeColorPicker.baseColor, val);
+    });
+  }
+
+  // Hex input
+  if (hexInput) {
+    hexInput.addEventListener("input", (e) => {
+      let val = e.target.value.replace(/[^0-9a-fA-F]/g, "").slice(0, 6);
+      e.target.value = val.toUpperCase();
+      if (val.length === 6 || val.length === 3) {
+        const fullHex = normalizeHex("#" + val);
+        chips.forEach((c) => {
+          c.classList.toggle("active", (c.dataset.color || "").toLowerCase() === fullHex.toLowerCase());
+        });
+        applyActiveColor(fullHex, fullHex, 50);
+      }
+    });
+  }
+
+  // Close on click outside
+  document.addEventListener("pointerdown", (e) => {
+    if (popover.classList.contains("hidden")) return;
+    if (popover.contains(e.target) || (activeColorPicker.activeButton && activeColorPicker.activeButton.contains(e.target))) {
+      return;
+    }
+    closePopover();
+  });
+
+  // Close on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !popover.classList.contains("hidden")) {
+      closePopover();
+    }
+  });
+
+  // Close if Settings modal is closed
+  const settingsModal = document.getElementById("settings-modal");
+  if (settingsModal) {
+    const observer = new MutationObserver(() => {
+      if (settingsModal.style.display === "none") {
+        closePopover();
+      }
+    });
+    observer.observe(settingsModal, { attributes: true, attributeFilter: ["style"] });
+  }
+}
+
 function initSettingsUI() {
   renderPresetThemeGrid();
   renderSavedCustomThemes();
@@ -2084,10 +2315,40 @@ function renderPresetThemeGrid() {
   });
 }
 
+function computeShade(baseHex, val) {
+  let hex = (baseHex || "#8AADF4").replace(/^#/, "");
+  if (hex.length === 3) {
+    hex = hex.split("").map((c) => c + c).join("");
+  }
+  const num = parseInt(hex, 16);
+  if (isNaN(num)) return "#8AADF4";
+
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+
+  let outR, outG, outB;
+  if (val <= 50) {
+    const factor = val / 50;
+    outR = Math.round(r * factor);
+    outG = Math.round(g * factor);
+    outB = Math.round(b * factor);
+  } else {
+    const factor = (val - 50) / 50;
+    outR = Math.round(r + (255 - r) * factor);
+    outG = Math.round(g + (255 - g) * factor);
+    outB = Math.round(b + (255 - b) * factor);
+  }
+
+  const toHex = (n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
+  return `#${toHex(outR)}${toHex(outG)}${toHex(outB)}`.toUpperCase();
+}
+
 function updateColorPickersUI(colorsObj) {
   COLOR_PICKER_MAP.forEach(({ inputId, hexId, varName }) => {
     const input = document.getElementById(inputId);
     const hexSpan = document.getElementById(hexId);
+    const preview = document.getElementById("preview-" + inputId);
     if (!input) return;
 
     let hexVal = colorsObj[varName];
@@ -2097,6 +2358,7 @@ function updateColorPickersUI(colorsObj) {
     hexVal = normalizeHex(hexVal);
 
     input.value = hexVal;
+    if (preview) preview.style.backgroundColor = hexVal;
     if (hexSpan) hexSpan.textContent = hexVal.toUpperCase();
   });
 }
@@ -2213,35 +2475,8 @@ function bindSettingsInteractiveEvents() {
     });
   });
 
-  // Color pickers input
-  COLOR_PICKER_MAP.forEach(({ inputId, hexId, varName }) => {
-    const input = document.getElementById(inputId);
-    const hexSpan = document.getElementById(hexId);
-    if (!input) return;
-
-    input.addEventListener("input", (e) => {
-      const val = e.target.value;
-      if (hexSpan) hexSpan.textContent = val.toUpperCase();
-      document.documentElement.style.setProperty(varName, val);
-
-      if (!userSettings.customColors) {
-        userSettings.customColors = {};
-      }
-      userSettings.customColors[varName] = val;
-      userSettings.themeId = "custom";
-
-      // If card color changed, adjust card hover
-      if (varName === "--bg-card") {
-        document.documentElement.style.setProperty("--bg-card-hover", val);
-      }
-
-      saveSettingsToStorage();
-      const presetsGrid = document.getElementById("theme-presets-grid");
-      if (presetsGrid) {
-        presetsGrid.querySelectorAll(".theme-preset-card").forEach((c) => c.classList.remove("active"));
-      }
-    });
-  });
+  // In-App Bidirectional Shade Color Picker
+  initInAppColorPicker();
 
   // Save custom theme button
   const btnSaveTheme = document.getElementById("btn-save-custom-theme");
@@ -2498,7 +2733,7 @@ const EXPORT_CONFIG_STORAGE_KEY = "appindex_export_default_config";
 const FACTORY_EXPORT_CONFIG = {
   format: "csv",
   sources: [
-    "repo_rpm,repo_pacman,repo_apt",
+    "repo_rpm,repo_pacman,repo_apt,repo_dpkg",
     "flatpak",
     "appimage",
     "steam",

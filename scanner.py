@@ -818,7 +818,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
     pkg_type = distro_info.get("pkg_manager_type", "rpm")
     uninstall_prefix = distro_info.get("uninstall_prefix", "sudo rm -f")
 
-    repo_source_type = f"repo_{pkg_type}" if pkg_type in ("rpm", "pacman", "dpkg") else "repo_system"
+    repo_source_type = "repo_apt" if pkg_type == "dpkg" else (f"repo_{pkg_type}" if pkg_type in ("rpm", "pacman") else "repo_system")
     repo_source_label = f"{distro_name} Repo ({pkg_label})"
 
     now_epoch = time.time()
@@ -1171,7 +1171,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         "repo_system": sum(1 for a in applications if a["source_type"].startswith("repo_")),
         "repo_rpm": sum(1 for a in applications if a["source_type"] == "repo_rpm"),
         "repo_pacman": sum(1 for a in applications if a["source_type"] == "repo_pacman"),
-        "repo_apt": sum(1 for a in applications if a["source_type"] == "repo_apt"),
+        "repo_apt": sum(1 for a in applications if a["source_type"] in ("repo_apt", "repo_dpkg")),
         "flatpak": sum(1 for a in applications if a["source_type"] == "flatpak"),
         "appimage": sum(1 for a in applications if a["source_type"] == "appimage"),
         "steam": sum(1 for a in applications if a["source_type"] == "steam"),
