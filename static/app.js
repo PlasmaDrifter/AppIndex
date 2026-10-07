@@ -1966,7 +1966,8 @@ function initInAppColorPicker() {
     const popoverWidth = 340;
     const popoverHeight = 130;
 
-    let left = rect.left;
+    // Center horizontally on the trigger button
+    let left = rect.left + (rect.width / 2) - (popoverWidth / 2);
     if (left + popoverWidth > window.innerWidth - 12) {
       left = window.innerWidth - popoverWidth - 12;
     }
