@@ -67,21 +67,16 @@ AppIndex automatically detects your host distribution via `/etc/os-release` and 
 
 ## Key Features
 
-- **Freedesktop XDG Specification Compliance**: Fully implements directory precedence (`~/.local/share/applications` > `/var/lib/flatpak/exports` > `/usr/share/applications`) to deduplicate launchers and correctly identify user overrides.
-- **Dynamic Desktop Environment Detection**: Evaluates `OnlyShowIn` and `NotShowIn` against `$XDG_CURRENT_DESKTOP` to accurately reflect app menu visibility on KDE Plasma, GNOME, XFCE, Cinnamon, MATE, and window managers.
-- **Application Launch Frequency & Last Used Tracking**: Automatically analyzes systemd user journal scopes (`app-*.scope` / `app-*@*.service`) and Steam play history to surface launch counts and exact last-opened timestamps, persisted with low-latency SQLite caching and background incremental synchronization.
-- **Recent Update & Version Transition Tracking**: Automatically tracks software installed or upgraded within the last 48 hours across RPM/DNF transactions, Flatpak deployments, AppImages, and Steam libraries, detailing version transitions (e.g. `old -> new`) and relative update times.
-- **Anchored Header & Table Controls**: Pinned navigation header, toolbar, filter tabs, and table column headers keep controls anchored at the top of the viewport while scrolling through applications, with automatic scroll-to-top resets when changing categories, sources, or search queries.
-- **Dual Presentation**: Toggle between a dense, sorting-capable Data Table and a responsive Card Grid.
-- **Helper & Daemon Filtering**: Toolbar toggle to show or hide background daemons, system services, and utilities marked `NoDisplay=true`.
-- **Real-Time Search & Category Filters**: Multi-field search by name, package ID, binary path, comment, or desktop file with instant filtering.
-- **Theme & Appearance Engine**:
-  - 7 Built-in Themes: Catppuccin Macchiato, Tokyo Night, Nord, Gruvbox Dark, Dracula, Cyberpunk, and Clean Light.
-  - Custom Theme Editor: Real-time color customizer with save and delete capability.
-  - View Density Controls: Compact, Standard, and Spacious layout spacing.
-  - Font Scaling: Interactive font slider from 80% to 130%.
-  - Zero-FOUC persistence in browser local storage.
-- **Export Formats**: Download complete inventory reports in CSV or JSON formats with custom field, package source, and visibility selectors.
+- **Freedesktop XDG Specification Compliance**
+- **Dynamic Desktop Environment Detection**
+- **Application Launch Frequency & Last Used Tracking**
+- **Recent Update & Version Transition Tracking**
+- **Anchored Header & Table Controls**
+- **Dual Presentation**
+- **Helper & Daemon Filtering**
+- **Real-Time Search & Category Filters**
+- **Theme & Appearance Engine**
+- **Export Formats**
 
 ---
 
