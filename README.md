@@ -123,17 +123,38 @@ Alternatively, using pip:
 pip install fastapi uvicorn pyxdg pillow
 ```
 
-### 3. Launch AppIndex
+### 3. One-Click Installation
 
-You can launch AppIndex directly using the bundled launcher script:
+Run the installer script to automatically set up the application icon, desktop launcher, CLI symlink (`~/.local/bin/appindex`), and background systemd user service:
+
+```bash
+./install.sh
+```
+
+To remove all installed shortcuts, symlinks, and background services:
+```bash
+./uninstall.sh
+```
+*(Optionally add `--purge` to also delete cached application usage history: `./uninstall.sh --purge`)*
+
+---
+
+### 4. Manual Launch & CLI Commands
+
+You can also launch AppIndex directly using the bundled launcher script:
 
 ```bash
 ./appindex.sh
 ```
 
-This starts the backend server in the background (if not already running) and opens your default browser at `http://localhost:8765`.
+Or using the CLI command created by the installer:
+```bash
+appindex status     # Check server status
+appindex scan       # Trigger a fresh inventory scan
+appindex restart    # Restart background server
+```
 
-To run the server in the foreground instead:
+To run the server in the foreground:
 ```bash
 python3 server.py --host 127.0.0.1 --port 8765
 ```
@@ -142,7 +163,7 @@ python3 server.py --host 127.0.0.1 --port 8765
 
 ## Desktop Menu Entry
 
-To integrate AppIndex into your application launcher (KDE, GNOME, XFCE, etc.), create `~/.local/share/applications/appindex.desktop`:
+To integrate AppIndex into your application launcher (KDE, GNOME, XFCE, etc.), create `~/.local/share/applications/appindex.desktop` (already done automatically by `./install.sh`):
 
 ```ini
 [Desktop Entry]
@@ -151,7 +172,7 @@ Name=AppIndex
 GenericName=Linux Application & Package Inventory
 Comment=Inspect installed applications, package managers, and uninstall commands
 Exec=xdg-open http://localhost:8765
-Icon=utilities-terminal
+Icon=appindex
 Terminal=false
 Categories=Utility;System;
 Keywords=apps;packages;inventory;uninstall;flatpak;appimage;rpm;pacman;apt;steam;pwa;
@@ -161,7 +182,7 @@ Keywords=apps;packages;inventory;uninstall;flatpak;appimage;rpm;pacman;apt;steam
 
 ## Optional: Systemd User Service Setup
 
-If you prefer to have AppIndex running permanently in the background as a user service:
+If you prefer to manually configure AppIndex to run permanently in the background as a user service (already done automatically by `./install.sh`):
 
 1. Create `~/.config/systemd/user/appindex.service`:
 
