@@ -1341,7 +1341,7 @@ body {
 
 .apps-table tr {
   display: grid;
-  grid-template-columns: 22px 280px 150px 170px 170px minmax(220px, 1fr) 150px 55px 85px;
+  grid-template-columns: 22px 280px 150px 170px 170px minmax(200px, 1fr) 140px 110px 85px;
   align-items: center;
   gap: 12px;
   padding: 0 14px;
@@ -1617,11 +1617,30 @@ body {
   white-space: nowrap;
 }
 
+.col-category,
 .col-menu-status {
   display: flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+}
+
+.apps-table td.col-category .category-badge,
+.apps-table td.col-menu-status .category-badge {
+  display: inline-block;
+  font-size: calc(11px * var(--font-scale, 1));
+  font-weight: 500;
+  color: var(--text-secondary, #a5adcb);
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color, #363a4f);
+  border-radius: var(--radius-sm, 6px);
+  padding: 2px 7px;
+  line-height: 1.3;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
 }
 
 .apps-table td.col-menu-status .menu-status-text {

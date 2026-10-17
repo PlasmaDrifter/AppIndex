@@ -1017,10 +1017,10 @@ function getFilteredApps() {
       return aTime - bTime || (a.launch_count || 0) - (b.launch_count || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     } else if (currentSort === "launches_desc") {
       return (b.launch_count || 0) - (a.launch_count || 0) || (b.last_used_time || 0) - (a.last_used_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    } else if (currentSort === "menu_asc") {
-      return (b.in_menu ? 1 : 0) - (a.in_menu ? 1 : 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    } else if (currentSort === "menu_desc") {
-      return (a.in_menu ? 1 : 0) - (b.in_menu ? 1 : 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "category_asc" || currentSort === "menu_asc") {
+      return (a.primary_category || "Other").localeCompare(b.primary_category || "Other", undefined, { sensitivity: "base" }) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    } else if (currentSort === "category_desc" || currentSort === "menu_desc") {
+      return (b.primary_category || "Other").localeCompare(a.primary_category || "Other", undefined, { sensitivity: "base" }) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     }
     return 0;
   });
@@ -1050,9 +1050,9 @@ function updateSortHeaderUI() {
     } else if (key === "usage") {
       if (currentSort === "last_used_desc" || currentSort === "launches_desc") th.classList.add("sorted-desc");
       else if (currentSort === "last_used_asc") th.classList.add("sorted-asc");
-    } else if (key === "menu") {
-      if (currentSort === "menu_asc") th.classList.add("sorted-asc");
-      else if (currentSort === "menu_desc") th.classList.add("sorted-desc");
+    } else if (key === "category" || key === "menu") {
+      if (currentSort === "category_asc" || currentSort === "menu_asc") th.classList.add("sorted-asc");
+      else if (currentSort === "category_desc" || currentSort === "menu_desc") th.classList.add("sorted-desc");
     }
   });
 
@@ -1106,11 +1106,11 @@ function handleColumnHeaderClick(e) {
     if (currentSort === "last_used_desc" || currentSort === "launches_desc") nextSort = "last_used_asc";
     else if (currentSort === "last_used_asc") nextSort = "name_asc";
     else nextSort = "last_used_desc";
-  } else if (key === "menu") {
-    // Cycle: menu_asc -> menu_desc -> name_asc (reset)
-    if (currentSort === "menu_asc") nextSort = "menu_desc";
-    else if (currentSort === "menu_desc") nextSort = "name_asc";
-    else nextSort = "menu_asc";
+  } else if (key === "category" || key === "menu") {
+    // Cycle: category_asc -> category_desc -> name_asc (reset)
+    if (currentSort === "category_asc" || currentSort === "menu_asc") nextSort = "category_desc";
+    else if (currentSort === "category_desc" || currentSort === "menu_desc") nextSort = "name_asc";
+    else nextSort = "category_asc";
   }
 
   currentSort = nextSort;
@@ -1336,9 +1336,9 @@ function renderTable(apps) {
       <td class="col-usage">
         ${usageCellHtml}
       </td>
-      <td class="col-menu-status">
-        <span class="menu-status-text ${app.in_menu ? "yes" : "no"}" title="${app.in_menu ? "Visible in Application Menu" : "Hidden / Helper Application"}">
-          ${app.in_menu ? "YES" : "NO"}
+      <td class="col-category col-menu-status">
+        <span class="category-badge" title="${escapeHtml(app.primary_category || "Other")}${app.in_menu ? " (In Menu)" : " (Hidden)"}">
+          ${escapeHtml(app.primary_category || "Other")}
         </span>
       </td>
       <td class="col-action">
