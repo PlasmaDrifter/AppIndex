@@ -1341,7 +1341,7 @@ body {
 
 .apps-table tr {
   display: grid;
-  grid-template-columns: 22px 280px 150px 170px 170px minmax(200px, 1fr) 140px 110px 85px;
+  grid-template-columns: 22px 280px 150px 170px 170px minmax(180px, 1fr) 140px 135px 85px;
   align-items: center;
   gap: 12px;
   padding: 0 14px;
@@ -1625,6 +1625,13 @@ body {
   white-space: nowrap;
 }
 
+.category-badge-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
 .apps-table td.col-category .category-badge,
 .apps-table td.col-menu-status .category-badge {
   display: inline-block;
@@ -1641,6 +1648,23 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   user-select: none;
+}
+
+.category-badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(9.5px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--accent-cyan, #8bd5ca);
+  background-color: rgba(139, 213, 202, 0.12);
+  border: 1px solid rgba(139, 213, 202, 0.35);
+  border-radius: 10px;
+  padding: 0 4px;
+  line-height: 1.4;
+  flex-shrink: 0;
+  user-select: none;
+  cursor: help;
 }
 
 .apps-table td.col-menu-status .menu-status-text {

@@ -283,5 +283,23 @@ class TestUsageTracker(unittest.TestCase):
         self.assertIsInstance(count, int)
 
 
+class TestMenuLayout(unittest.TestCase):
+    def test_get_desktop_menu_layout(self):
+        from scanner import get_desktop_menu_layout
+        active_cats, hidden_files = get_desktop_menu_layout()
+        self.assertIsInstance(active_cats, dict)
+        self.assertIsInstance(hidden_files, set)
+
+    def test_app_menu_categories_in_scan(self):
+        from scanner import scan_all_applications
+        res = scan_all_applications()
+        apps = res.get("applications", [])
+        self.assertTrue(len(apps) > 0)
+        for app in apps:
+            self.assertIn("menu_categories", app)
+            self.assertIsInstance(app["menu_categories"], list)
+            self.assertIn("primary_category", app)
+
+
 if __name__ == "__main__":
     unittest.main()

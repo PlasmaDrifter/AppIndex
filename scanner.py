@@ -13,7 +13,9 @@ import shlex
 import shutil
 import subprocess
 import time
-from typing import Dict, List, Optional, Any
+import xml.etree.ElementTree as ET
+from collections import defaultdict
+from typing import Dict, List, Optional, Any, Set, Tuple
 
 try:
     import rpm
@@ -741,11 +743,93 @@ def extract_executable(exec_cmd: str) -> Optional[str]:
     return None
 
 
+def get_desktop_menu_layout() -> Tuple[Dict[str, List[str]], Set[str]]:
+    """Parse active desktop environment application menu layout XML.
+    Returns:
+        tuple: (active_menu_categories: Dict[desktop_filename, List[category_names]],
+                hidden_desktop_filenames: Set[desktop_filename])
+    """
+    active_menu_categories: Dict[str, List[str]] = defaultdict(list)
+    hidden_desktop_filenames: Set[str] = set()
+
+    # Search candidates in priority order (KDE Plasma kmenuedit override first, then standard XDG menus)
+    menu_candidates = [
+        os.path.expanduser("~/.config/menus/applications-kmenuedit.menu"),
+        os.path.expanduser("~/.config/menus/plasma-applications.menu"),
+        os.path.expanduser("~/.config/menus/applications.menu"),
+        "/etc/xdg/menus/plasma-applications.menu",
+        "/etc/xdg/menus/kf5-applications.menu",
+        "/etc/xdg/menus/applications.menu",
+    ]
+
+    selected_menu = None
+    for candidate in menu_candidates:
+        if os.path.isfile(candidate):
+            selected_menu = candidate
+            break
+
+    if not selected_menu:
+        return active_menu_categories, hidden_desktop_filenames
+
+    try:
+        tree = ET.parse(selected_menu)
+        root = tree.getroot()
+
+        # Parse hidden applications
+        for menu in root.findall("Menu"):
+            name_el = menu.find("Name")
+            if name_el is not None and name_el.text and name_el.text.strip() == ".hidden":
+                for inc in menu.findall("Include"):
+                    for fn in inc.findall("Filename"):
+                        if fn.text:
+                            hidden_desktop_filenames.add(fn.text.strip())
+
+        ignored_menu_categories = {".hidden", "Help", "chrome-apps", "webapps-webapps", "Applications"}
+
+        for menu in root.findall("Menu"):
+            name_el = menu.find("Name")
+            if name_el is None or not name_el.text:
+                continue
+            cat_name = name_el.text.strip()
+            if cat_name in ignored_menu_categories:
+                continue
+
+            # Standardize or map category names if needed
+            display_cat = cat_name
+            if cat_name == "Multimedia":
+                display_cat = "Audio & Video"
+
+            for fn in menu.findall("Layout/Filename"):
+                if fn.text:
+                    fname = fn.text.strip()
+                    if fname not in hidden_desktop_filenames:
+                        if display_cat not in active_menu_categories[fname]:
+                            active_menu_categories[fname].append(display_cat)
+
+            # Also check direct Includes that are not Excluded if Layout is empty
+            layout_files = menu.findall("Layout/Filename")
+            if not layout_files:
+                excluded = {ex.text.strip() for exc in menu.findall("Exclude") for ex in exc.findall("Filename") if ex.text}
+                for inc in menu.findall("Include"):
+                    for fn in inc.findall("Filename"):
+                        if fn.text:
+                            fname = fn.text.strip()
+                            if fname not in excluded and fname not in hidden_desktop_filenames:
+                                if display_cat not in active_menu_categories[fname]:
+                                    active_menu_categories[fname].append(display_cat)
+
+    except Exception:
+        pass
+
+    return active_menu_categories, hidden_desktop_filenames
+
+
 def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
     """Scan all desktop directories and standalone apps, cross-referencing package managers."""
     distro_info = get_distribution_info()
     active_desktops = get_active_desktop_environments()
     flatpak_apps = get_flatpak_installed()
+    active_menu_cats, hidden_menu_files = get_desktop_menu_layout()
 
     desktop_records = []
     seen_desktop_filenames = {}
@@ -1057,6 +1141,19 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
             steam_id=steam_id if source_type == "steam" else "",
         )
 
+        app_in_menu = data["in_menu"]
+        if fname in hidden_menu_files:
+            app_in_menu = False
+
+        app_menu_categories = list(active_menu_cats.get(fname, []))
+        app_primary_cat = data["primary_category"]
+        if app_menu_categories:
+            app_primary_cat = app_menu_categories[0]
+            app_in_menu = True
+        elif not app_in_menu:
+            # If not in menu and no active menu categories, keep primary_category as fallback
+            pass
+
         app_id = f"{scope}:{fname}"
         applications.append(
             {
@@ -1066,8 +1163,9 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                 "comment": data["comment"],
                 "icon": data["icon"],
                 "categories": data["categories"],
-                "primary_category": data["primary_category"],
-                "in_menu": data["in_menu"],
+                "primary_category": app_primary_cat,
+                "menu_categories": app_menu_categories,
+                "in_menu": app_in_menu,
                 "no_display": data["no_display"],
                 "hidden": data["hidden"],
                 "scope": scope,
@@ -1128,6 +1226,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                             "icon": "application-x-executable",
                             "categories": ["Utility"],
                             "primary_category": "Utilities",
+                            "menu_categories": [],
                             "in_menu": False,
                             "no_display": False,
                             "hidden": False,

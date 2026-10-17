@@ -976,7 +976,10 @@ function getFilteredApps() {
     }
 
     // Category Filter
-    if (currentCategoryFilter !== "all") {
+    if (currentCategoryFilter === "__multiple__") {
+      const menuCats = Array.isArray(app.menu_categories) && app.menu_categories.length > 0 ? app.menu_categories : [];
+      if (menuCats.length < 2) return false;
+    } else if (currentCategoryFilter !== "all") {
       if (app.primary_category !== currentCategoryFilter) return false;
     }
 
@@ -1182,7 +1185,19 @@ function renderCards(apps) {
             <div class="card-badges">
               <span class="badge ${badgeClass}">${escapeHtml(app.source_label)}</span>
               <span class="badge ${menuBadgeClass}">${menuBadgeText}</span>
-              ${app.primary_category ? `<span class="badge badge-unmanaged">${escapeHtml(app.primary_category)}</span>` : ""}
+              ${(() => {
+                if (!app.primary_category) return "";
+                const primCat = app.primary_category;
+                const menuCats = Array.isArray(app.menu_categories) && app.menu_categories.length > 0 ? app.menu_categories : [primCat];
+                const extraCount = menuCats.length - 1;
+                const tooltip = `Menu Category: ${primCat}${extraCount > 0 ? ` (In Menu: ${menuCats.join(", ")})` : ""}`;
+                return `
+                  <div class="category-badge-group" title="${escapeHtml(tooltip)}">
+                    <span class="badge badge-unmanaged">${escapeHtml(primCat)}</span>
+                    ${extraCount > 0 ? `<span class="category-badge-count" title="${escapeHtml("In Menu: " + menuCats.join(", "))}">+${extraCount}</span>` : ""}
+                  </div>
+                `;
+              })()}
               ${app.is_recent_update ? `<span class="badge badge-recent-update" title="Updated within last 48 hours">Updated</span>` : ""}
             </div>
           </div>
@@ -1337,9 +1352,18 @@ function renderTable(apps) {
         ${usageCellHtml}
       </td>
       <td class="col-category col-menu-status">
-        <span class="category-badge" title="${escapeHtml(app.primary_category || "Other")}${app.in_menu ? " (In Menu)" : " (Hidden)"}">
-          ${escapeHtml(app.primary_category || "Other")}
-        </span>
+        ${(() => {
+          const primCat = app.primary_category || "Other";
+          const menuCats = Array.isArray(app.menu_categories) && app.menu_categories.length > 0 ? app.menu_categories : (app.primary_category ? [app.primary_category] : []);
+          const extraCount = menuCats.length - 1;
+          const tooltip = `Category: ${primCat}${extraCount > 0 ? ` (In Menu: ${menuCats.join(", ")})` : ""}${app.in_menu ? " • In Menu" : " • Hidden"}`;
+          return `
+            <div class="category-badge-group" title="${escapeHtml(tooltip)}">
+              <span class="category-badge">${escapeHtml(primCat)}</span>
+              ${extraCount > 0 ? `<span class="category-badge-count" title="${escapeHtml("In Menu: " + menuCats.join(", "))}">+${extraCount}</span>` : ""}
+            </div>
+          `;
+        })()}
       </td>
       <td class="col-action">
         <button class="btn btn-sm btn-table-inspect" title="View application details and metadata">
@@ -1419,7 +1443,9 @@ function openModal(app) {
   }
   modalSize.textContent = app.installed_size || "Unknown";
   modalMenuStatus.textContent = app.in_menu ? "Visible in Application Menu" : "Hidden / Helper Application";
-  modalCategory.textContent = app.primary_category + (app.categories && app.categories.length ? ` (${app.categories.join(", ")})` : "");
+  const menuCatsStr = app.menu_categories && app.menu_categories.length ? `Active Menu: ${app.menu_categories.join(", ")}` : (app.in_menu ? app.primary_category : "Not in menu");
+  const rawCatsStr = app.categories && app.categories.length ? `Desktop Tags: ${app.categories.join(", ")}` : "";
+  modalCategory.textContent = [menuCatsStr, rawCatsStr].filter(Boolean).join(" | ");
   modalExec.textContent = app.exec_command || "N/A";
   modalDesktopPath.textContent = app.desktop_path || "Standalone executable (no .desktop file)";
   modalUninstallCmd.textContent = app.uninstall_command || "No uninstall command available";

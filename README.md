@@ -74,7 +74,8 @@ AppIndex automatically detects your host distribution via `/etc/os-release` and 
 - **Anchored Header & Table Controls**
 - **Dual Presentation**
 - **Helper & Daemon Filtering**
-- **Real-Time Search & Category Filters**
+- **Desktop Menu Category & Multi-Category Detection**: Resolves active desktop menu categories directly from the desktop environment menu layout (e.g. KDE Plasma kmenuedit and XDG menu definitions), highlighting applications placed across multiple menu categories (+N badge) to easily spot duplicate shortcuts.
+- **Real-Time Search & Category Filters**: Instant fuzzy search across applications, packages, comments, and commands, with dedicated category and multi-category filters.
 - **Theme & Appearance Engine**
 - **Export Formats**
 
