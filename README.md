@@ -138,6 +138,18 @@ To remove all installed shortcuts, symlinks, and background services:
 ```
 *(Optionally add `--purge` to also delete cached application usage history: `./uninstall.sh --purge`)*
 
+### Updating
+
+To update an existing installation to the latest version:
+
+```bash
+cd AppIndex
+git pull
+./install.sh
+```
+
+Running `./install.sh` updates the application files, desktop shortcuts, CLI symlinks, and restarts the background service (`appindex.service`) if active.
+
 ---
 
 ### 4. Manual Launch & CLI Commands
