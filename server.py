@@ -661,7 +661,8 @@ async def get_desktop_content(path: str = Query(...)):
                     with open(canonical_path, "r", encoding="utf-8", errors="replace") as f:
                         return {"path": canonical_path, "content": f.read()}
                 except Exception as e:
-                    raise HTTPException(status_code=500, detail=str(e))
+                    logger.error(f"Failed to read desktop file '{canonical_path}': {e}")
+                    raise HTTPException(status_code=500, detail="Failed to read desktop file")
             raise HTTPException(status_code=404, detail="Desktop file not found")
     raise HTTPException(status_code=403, detail="Access denied")
 
@@ -763,7 +764,8 @@ def apply_update_api():
     try:
         result = apply_self_update(target_tag=latest_ver)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error(f"Failed to apply update: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to apply update")
 
     trigger_server_restart()
     return {
@@ -790,7 +792,8 @@ async def update_auto_export_settings(request: Request):
         updated = save_auto_export_config(body)
         return {"status": "ok", "config": updated}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to update auto-export configuration: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update auto-export configuration")
 
 
 @app.post("/api/auto-export/run-now")

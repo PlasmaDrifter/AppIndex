@@ -207,7 +207,8 @@ def run_export_job(apps_data: Optional[List[Dict[str, Any]]] = None) -> Tuple[bo
     try:
         target_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        msg = f"Failed to create destination directory '{target_dir}': {e}"
+        logger.error(f"Failed to create destination directory: {e}")
+        msg = "Failed to create destination directory"
         _record_run_result(config, success=False, message=msg, file_path="", count=0)
         return False, msg, "", 0
 
@@ -217,7 +218,8 @@ def run_export_job(apps_data: Optional[List[Dict[str, Any]]] = None) -> Tuple[bo
             scan_result = scan_all_applications()
             apps_data = scan_result.get("applications", [])
         except Exception as e:
-            msg = f"Failed to fetch application inventory: {e}"
+            logger.error(f"Failed to fetch application inventory: {e}")
+            msg = "Failed to fetch application inventory"
             _record_run_result(config, success=False, message=msg, file_path="", count=0)
             return False, msg, "", 0
 
@@ -303,7 +305,8 @@ def run_export_job(apps_data: Optional[List[Dict[str, Any]]] = None) -> Tuple[bo
         return True, msg, main_file, len(sorted_apps)
 
     except Exception as e:
-        msg = f"Export generation failed: {e}"
+        logger.error(f"Export generation failed: {e}")
+        msg = "Export generation failed"
         _record_run_result(config, success=False, message=msg, file_path="", count=0)
         return False, msg, "", 0
 
