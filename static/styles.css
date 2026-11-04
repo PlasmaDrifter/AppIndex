@@ -3015,11 +3015,13 @@ body.density-spacious .app-icon {
 
 .export-modal-body {
   overflow-y: auto;
-  padding: 20px;
+  overflow-x: hidden;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   max-height: calc(85vh - 170px);
+  box-sizing: border-box;
 }
 
 .export-format-selector {
@@ -3166,6 +3168,187 @@ body.density-spacious .app-icon {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+/* Export Mode Tabs */
+.export-mode-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 24px 0 24px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+}
+
+.export-mode-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.export-mode-tab:hover {
+  color: var(--text-primary);
+}
+
+.export-mode-tab.active {
+  color: var(--accent-cyan);
+  border-bottom-color: var(--accent-cyan);
+}
+
+/* Automated Export Settings */
+#auto-export-config-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.auto-export-grid-2x2,
+.auto-export-grid-4,
+.auto-export-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 580px) {
+  .auto-export-grid-2x2,
+  .auto-export-grid-4,
+  .auto-export-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auto-export-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.auto-export-field-group .settings-label,
+.auto-export-dest-group .settings-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.input-select {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  transition: border-color 0.15s ease;
+}
+
+.input-select:focus {
+  border-color: var(--border-focus);
+}
+
+.auto-export-dest-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.auto-export-dest-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.auto-export-dest-input-row .input-text {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  outline: none;
+}
+
+.auto-export-dest-input-row .input-text:focus {
+  border-color: var(--border-focus);
+}
+
+.settings-field-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.auto-export-status-card {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.auto-export-status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11.5px;
+  min-width: 0;
+}
+
+.auto-export-status-label {
+  font-weight: 600;
+  color: var(--text-muted);
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.auto-export-status-val {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.auto-export-status-file {
+  color: var(--accent-cyan);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.auto-export-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 /* Responsive */

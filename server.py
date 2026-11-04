@@ -31,8 +31,15 @@ except ImportError:
 
 from scanner import scan_all_applications
 from usage_tracker import start_background_usage_sync
+from auto_exporter import (
+    get_auto_export_config,
+    save_auto_export_config,
+    run_export_job,
+    start_auto_export_scheduler,
+    on_inventory_rescan,
+)
 
-APP_VERSION = "0.5.4"
+APP_VERSION = "0.5.5"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 app = FastAPI(title="AppIndex", version=APP_VERSION)
@@ -165,7 +172,7 @@ def apply_self_update(target_tag: str = "") -> dict:
         # Check if working tree has uncommitted local changes (e.g. during active development / testing)
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.5.4"
+            new_ver = target_tag.lstrip("v") if target_tag else "0.5.5"
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -592,14 +599,18 @@ async def get_apps(recent_hours: int = Query(48, ge=1, le=8760)):
 async def refresh_apps(recent_hours: int = Query(48, ge=1, le=8760)):
     """Force re-scan of the system applications."""
     start_background_usage_sync()
-    return get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
+    result = get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
+    on_inventory_rescan(result.get("applications", []))
+    return result
 
 
 @app.post("/api/scan")
 async def scan_apps_alias(recent_hours: int = Query(48, ge=1, le=8760)):
     """Alias for /api/refresh for CLI compat."""
     start_background_usage_sync()
-    return get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
+    result = get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
+    on_inventory_rescan(result.get("applications", []))
+    return result
 
 
 @app.api_route("/api/icon", methods=["GET", "HEAD"])
@@ -763,6 +774,48 @@ def apply_update_api():
     }
 
 
+@app.get("/api/auto-export")
+async def get_auto_export_settings():
+    """Return the current auto-export configuration and execution status."""
+    return get_auto_export_config()
+
+
+@app.post("/api/auto-export")
+async def update_auto_export_settings(request: Request):
+    """Update auto-export configuration."""
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Invalid configuration format")
+    try:
+        updated = save_auto_export_config(body)
+        return {"status": "ok", "config": updated}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/auto-export/run-now")
+async def trigger_auto_export_now():
+    """Manually trigger the auto-export job immediately."""
+    data = get_cached_or_scan(force_refresh=False)
+    apps = data.get("applications", [])
+    success, message, file_path, count = run_export_job(apps_data=apps)
+    return {
+        "status": "ok" if success else "error",
+        "success": success,
+        "message": message,
+        "file_path": file_path,
+        "count": count,
+        "config": get_auto_export_config(),
+    }
+
+
+@app.on_event("startup")
+def on_app_startup():
+    """Initialize background daemons on application startup."""
+    start_background_usage_sync()
+    start_auto_export_scheduler()
+
+
 # Mount static assets
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -771,6 +824,7 @@ if os.path.isdir(STATIC_DIR):
 def start_server(host: str = "127.0.0.1", port: int = 8765):
     """Start the Uvicorn web server."""
     start_background_usage_sync()
+    start_auto_export_scheduler()
     # Pre-warm cache on startup
     get_cached_or_scan()
     uvicorn.run(app, host=host, port=port, log_level="info")

@@ -77,7 +77,7 @@ AppIndex automatically detects your host distribution via `/etc/os-release` and 
 - **Desktop Menu Category & Multi-Category Detection**: Resolves active desktop menu categories directly from the desktop environment menu layout (e.g. KDE Plasma kmenuedit and XDG menu definitions), highlighting applications placed across multiple menu categories (+N badge) to easily spot duplicate shortcuts.
 - **Real-Time Search & Category Filters**: Instant fuzzy search across applications, packages, comments, and commands, with dedicated category and multi-category filters.
 - **Theme & Appearance Engine**
-- **Export Formats**
+- **Export Formats & Automated Scheduled Export**: Export system inventory to CSV or JSON with granular filtering by package source, menu visibility, and custom column selection. Includes an automated background exporter that writes periodic or rescan-triggered backups to any user-designated folder (e.g. `~/Documents/AppIndex_Exports`) with timestamped and latest pointers, plus configurable retention pruning of older exports.
 
 ---
 

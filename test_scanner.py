@@ -301,5 +301,161 @@ class TestMenuLayout(unittest.TestCase):
             self.assertIn("primary_category", app)
 
 
+class TestAutoExporter(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        import auto_exporter
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.orig_config_file = auto_exporter.CONFIG_FILE
+        auto_exporter.CONFIG_FILE = Path(self.temp_dir.name) / "test_auto_export.json"
+
+    def tearDown(self):
+        import auto_exporter
+        auto_exporter.CONFIG_FILE = self.orig_config_file
+        self.temp_dir.cleanup()
+
+    def test_get_and_save_auto_export_config(self):
+        from auto_exporter import get_auto_export_config, save_auto_export_config
+        cfg = get_auto_export_config()
+        self.assertIn("enabled", cfg)
+        self.assertIn("frequency", cfg)
+        self.assertIn("destination_dir", cfg)
+        self.assertIn("format", cfg)
+        self.assertIn("fields", cfg)
+
+        updated = save_auto_export_config({"frequency": "weekly", "format": "json"})
+        self.assertEqual(updated["frequency"], "weekly")
+        self.assertEqual(updated["format"], "json")
+
+    def test_run_export_job_csv_and_json(self):
+        from auto_exporter import run_export_job, save_auto_export_config
+        test_apps = [
+            {
+                "name": "TestApp1",
+                "source_type": "flatpak",
+                "source_label": "Flatpak (User)",
+                "package_name": "org.test.App1",
+                "in_menu": True,
+                "primary_category": "Utilities",
+            },
+            {
+                "name": "TestApp2",
+                "source_type": "repo_rpm",
+                "source_label": "RPM",
+                "package_name": "testapp2",
+                "in_menu": False,
+                "primary_category": "System",
+            },
+        ]
+
+        # Test CSV Export
+        save_auto_export_config({
+            "destination_dir": self.temp_dir.name,
+            "format": "csv",
+            "filename_pattern": "latest",
+            "sources": ["flatpak", "repo_rpm"],
+            "visibility": "all",
+            "fields": ["name", "source_label", "package_name"],
+        })
+        success, msg, path, count = run_export_job(apps_data=test_apps)
+        self.assertTrue(success)
+        self.assertEqual(count, 2)
+        self.assertTrue(os.path.isfile(path))
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn("name,source_label,package_name", content)
+            self.assertIn("TestApp1", content)
+            self.assertIn("TestApp2", content)
+
+        # Test JSON Export with in_menu filter
+        save_auto_export_config({
+            "destination_dir": self.temp_dir.name,
+            "format": "json",
+            "filename_pattern": "latest",
+            "sources": ["flatpak", "repo_rpm"],
+            "visibility": "in_menu",
+            "fields": ["name", "package_name"],
+        })
+        success, msg, path, count = run_export_job(apps_data=test_apps)
+        self.assertTrue(success)
+        self.assertEqual(count, 1)
+        with open(path, "r", encoding="utf-8") as f:
+            import json
+            data = json.load(f)
+            self.assertEqual(data["total_exported"], 1)
+            self.assertEqual(data["applications"][0]["name"], "TestApp1")
+
+    def test_auto_export_api_endpoints(self):
+        from server import app
+        from fastapi.testclient import TestClient
+        client = TestClient(app)
+
+        # GET /api/auto-export
+        res = client.get("/api/auto-export")
+        self.assertEqual(res.status_code, 200)
+        cfg = res.json()
+        self.assertIn("enabled", cfg)
+
+        # POST /api/auto-export
+        res_post = client.post("/api/auto-export", json={"destination_dir": self.temp_dir.name, "frequency": "daily"})
+        self.assertEqual(res_post.status_code, 200)
+        self.assertEqual(res_post.json()["config"]["destination_dir"], self.temp_dir.name)
+
+        # POST /api/auto-export/run-now
+        res_run = client.post("/api/auto-export/run-now")
+        self.assertEqual(res_run.status_code, 200)
+        data = res_run.json()
+        self.assertIn("success", data)
+        self.assertTrue(data["success"])
+
+    def test_prune_old_exports(self):
+        from pathlib import Path
+        import time
+        from auto_exporter import prune_old_exports, get_retained_export_files
+
+        target_dir = Path(self.temp_dir.name) / "prune_test"
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create latest file
+        latest_file = target_dir / "installed_apps_latest.csv"
+        latest_file.write_text("latest,file", encoding="utf-8")
+
+        # Create 5 timestamped files with staggered timestamps
+        created_files = []
+        for i in range(5):
+            f = target_dir / f"installed_apps_2026-11-0{i+1}_10-00-00.csv"
+            f.write_text(f"row,{i}", encoding="utf-8")
+            # Stagger modification times
+            os.utime(f, (1700000000 + i * 100, 1700000000 + i * 100))
+            created_files.append(f)
+
+        # Initially, 5 timestamped files exist
+        retained = get_retained_export_files(target_dir)
+        self.assertEqual(len(retained), 5)
+
+        # Prune with max_retained = 3
+        pruned_count, remaining_count = prune_old_exports(target_dir, max_retained=3)
+        self.assertEqual(pruned_count, 2)
+        self.assertEqual(remaining_count, 3)
+
+        # The latest pointer file must never be deleted
+        self.assertTrue(latest_file.exists())
+
+        # The oldest two (index 0 and 1) should be deleted
+        self.assertFalse(created_files[0].exists())
+        self.assertFalse(created_files[1].exists())
+
+        # The newest three (index 2, 3, 4) should still exist
+        self.assertTrue(created_files[2].exists())
+        self.assertTrue(created_files[3].exists())
+        self.assertTrue(created_files[4].exists())
+
+        # Test max_retained = 0 (unlimited retention)
+        pruned_zero, remaining_zero = prune_old_exports(target_dir, max_retained=0)
+        self.assertEqual(pruned_zero, 0)
+        self.assertEqual(remaining_zero, 3)
+
+
 if __name__ == "__main__":
     unittest.main()

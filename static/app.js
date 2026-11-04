@@ -346,6 +346,11 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("Error loading applications:", err);
   }
   try {
+    initAutoExportUI();
+  } catch (err) {
+    console.error("Error initializing auto-export UI:", err);
+  }
+  try {
     if (userSettings.checkForUpdates) {
       checkAppUpdatesAsync();
     }
@@ -2852,16 +2857,38 @@ function applyExportConfig(config) {
   updateExportPresetStatus();
 }
 
-function openExportModal() {
+function switchExportModalTab(tab) {
+  const manualTab = document.getElementById("tab-btn-export-manual");
+  const autoTab = document.getElementById("tab-btn-export-auto");
+  const manualView = document.getElementById("export-manual-view");
+  const autoView = document.getElementById("export-auto-view");
+
+  if (tab === "auto") {
+    if (manualTab) manualTab.classList.remove("active");
+    if (autoTab) autoTab.classList.add("active");
+    if (manualView) manualView.style.display = "none";
+    if (autoView) autoView.style.display = "block";
+    loadAutoExportConfig();
+  } else {
+    if (manualTab) manualTab.classList.add("active");
+    if (autoTab) autoTab.classList.remove("active");
+    if (manualView) manualView.style.display = "block";
+    if (autoView) autoView.style.display = "none";
+  }
+}
+
+function openExportModal(defaultTab = "manual") {
   const modal = document.getElementById("export-modal");
   if (modal) {
     modal.style.display = "flex";
+    switchExportModalTab(defaultTab);
     try {
       const config = getSavedExportConfig();
       applyExportConfig(config);
     } catch (err) {
       console.error("Error opening export modal:", err);
     }
+    loadAutoExportConfig();
   }
 }
 
@@ -2950,4 +2977,272 @@ function executeCustomExport() {
 
   closeExportModal();
   showToast(`Downloading custom ${format.toUpperCase()} export...`);
+}
+
+// ==========================================
+// Automated Application Export Logic
+// ==========================================
+
+let currentAutoExportConfig = null;
+
+async function loadAutoExportConfig() {
+  try {
+    const res = await fetch("/api/auto-export");
+    if (res.ok) {
+      currentAutoExportConfig = await res.json();
+      syncAutoExportUI(currentAutoExportConfig);
+    }
+  } catch (err) {
+    console.warn("Could not load auto-export config:", err);
+  }
+}
+
+function syncAutoExportUI(cfg) {
+  if (!cfg) return;
+
+  const toggle = document.getElementById("toggle-auto-export");
+  const panel = document.getElementById("auto-export-config-panel");
+  if (toggle) {
+    toggle.checked = Boolean(cfg.enabled);
+  }
+  if (panel) {
+    panel.style.display = cfg.enabled ? "flex" : "none";
+  }
+
+  const freqSel = document.getElementById("auto-export-frequency");
+  if (freqSel && cfg.frequency) {
+    freqSel.value = cfg.frequency;
+  }
+
+  const formatSel = document.getElementById("auto-export-format");
+  if (formatSel && cfg.format) {
+    formatSel.value = cfg.format;
+  }
+
+  const patternSel = document.getElementById("auto-export-pattern");
+  if (patternSel && cfg.filename_pattern) {
+    patternSel.value = cfg.filename_pattern;
+  }
+
+  const pruneSel = document.getElementById("auto-export-prune");
+  if (pruneSel && cfg.max_retained_entries !== undefined) {
+    pruneSel.value = String(cfg.max_retained_entries);
+  }
+
+  const destInput = document.getElementById("auto-export-dest");
+  if (destInput && cfg.destination_dir) {
+    destInput.value = cfg.destination_dir;
+  }
+
+  // Sources
+  const srcSet = new Set(cfg.sources || []);
+  document.querySelectorAll('input[name="auto-export-source"]').forEach((cb) => {
+    cb.checked = srcSet.has(cb.value);
+  });
+
+  // Visibility
+  const vis = cfg.visibility || "all";
+  document.querySelectorAll('input[name="auto-export-visibility"]').forEach((radio) => {
+    radio.checked = radio.value === vis;
+  });
+
+  // Fields
+  const fieldSet = new Set(cfg.fields || []);
+  document.querySelectorAll('input[name="auto-export-field"]').forEach((cb) => {
+    cb.checked = fieldSet.has(cb.value);
+  });
+
+  // Status card
+  const lastRunEl = document.getElementById("auto-export-last-run");
+  const retainedCountEl = document.getElementById("auto-export-retained-count");
+  const fileRow = document.getElementById("auto-export-file-row");
+  const fileEl = document.getElementById("auto-export-last-file");
+
+  if (lastRunEl) {
+    if (cfg.last_run_timestamp && cfg.last_run_date) {
+      const statusText = cfg.last_run_status === "success" ? "Success" : (cfg.last_run_status || "Completed");
+      lastRunEl.textContent = `${cfg.last_run_date} (${statusText} — ${cfg.last_run_count || 0} apps)`;
+    } else {
+      lastRunEl.textContent = "Never executed";
+    }
+  }
+
+  if (retainedCountEl && cfg.retained_file_count !== undefined) {
+    const count = cfg.retained_file_count || 0;
+    retainedCountEl.textContent = `${count} file${count === 1 ? "" : "s"}`;
+  }
+
+  if (fileRow && fileEl) {
+    if (cfg.last_run_file) {
+      fileRow.style.display = "flex";
+      fileEl.textContent = cfg.last_run_file;
+    } else {
+      fileRow.style.display = "none";
+    }
+  }
+}
+
+function collectAutoExportConfigFromUI() {
+  const toggle = document.getElementById("toggle-auto-export");
+  const freqSel = document.getElementById("auto-export-frequency");
+  const formatSel = document.getElementById("auto-export-format");
+  const patternSel = document.getElementById("auto-export-pattern");
+  const pruneSel = document.getElementById("auto-export-prune");
+  const destInput = document.getElementById("auto-export-dest");
+
+  const sources = Array.from(document.querySelectorAll('input[name="auto-export-source"]:checked')).map((cb) => cb.value);
+  const visibility = document.querySelector('input[name="auto-export-visibility"]:checked')?.value || "all";
+  const fields = Array.from(document.querySelectorAll('input[name="auto-export-field"]:checked')).map((cb) => cb.value);
+
+  const maxRetained = pruneSel ? parseInt(pruneSel.value, 10) : 10;
+
+  return {
+    enabled: toggle ? toggle.checked : false,
+    frequency: freqSel ? freqSel.value : "daily",
+    format: formatSel ? formatSel.value : "csv",
+    filename_pattern: patternSel ? patternSel.value : "both",
+    max_retained_entries: isNaN(maxRetained) ? 10 : maxRetained,
+    destination_dir: destInput ? (destInput.value.trim() || "~/Documents/AppIndex_Exports") : "~/Documents/AppIndex_Exports",
+    sources: sources.length > 0 ? sources : ["repo_rpm,repo_pacman,repo_apt,repo_dpkg", "flatpak", "appimage", "steam", "local_tool", "unmanaged,web_app"],
+    visibility: visibility,
+    fields: fields.length > 0 ? fields : ["name", "source_label", "package_name", "package_version", "installed_size", "in_menu", "primary_category", "exec_command", "desktop_path", "uninstall_command"],
+  };
+}
+
+function initAutoExportUI() {
+  const toggle = document.getElementById("toggle-auto-export");
+  const panel = document.getElementById("auto-export-config-panel");
+
+  if (toggle && panel) {
+    toggle.addEventListener("change", () => {
+      panel.style.display = toggle.checked ? "flex" : "none";
+    });
+  }
+
+  const btnDestDefault = document.getElementById("btn-auto-export-dest-default");
+  const destInput = document.getElementById("auto-export-dest");
+  if (btnDestDefault && destInput) {
+    btnDestDefault.addEventListener("click", () => {
+      destInput.value = "~/Documents/AppIndex_Exports";
+      showToast("Reset destination folder to default");
+    });
+  }
+
+  // Sources shortcuts
+  const btnSourcesAll = document.getElementById("btn-auto-export-sources-all");
+  const btnSourcesNone = document.getElementById("btn-auto-export-sources-none");
+  if (btnSourcesAll) {
+    btnSourcesAll.addEventListener("click", () => {
+      document.querySelectorAll('input[name="auto-export-source"]').forEach((cb) => (cb.checked = true));
+    });
+  }
+  if (btnSourcesNone) {
+    btnSourcesNone.addEventListener("click", () => {
+      document.querySelectorAll('input[name="auto-export-source"]').forEach((cb) => (cb.checked = false));
+    });
+  }
+
+  // Fields shortcuts
+  const btnFieldsAll = document.getElementById("btn-auto-export-fields-all");
+  const btnFieldsDefaults = document.getElementById("btn-auto-export-fields-defaults");
+  const btnFieldsNone = document.getElementById("btn-auto-export-fields-none");
+  if (btnFieldsAll) {
+    btnFieldsAll.addEventListener("click", () => {
+      document.querySelectorAll('input[name="auto-export-field"]').forEach((cb) => (cb.checked = true));
+    });
+  }
+  if (btnFieldsDefaults) {
+    btnFieldsDefaults.addEventListener("click", () => {
+      document.querySelectorAll('input[name="auto-export-field"]').forEach((cb) => {
+        cb.checked = cb.dataset.default === "true";
+      });
+    });
+  }
+  if (btnFieldsNone) {
+    btnFieldsNone.addEventListener("click", () => {
+      document.querySelectorAll('input[name="auto-export-field"]').forEach((cb) => (cb.checked = false));
+    });
+  }
+
+  // Save button
+  const btnSave = document.getElementById("btn-save-auto-export");
+  if (btnSave) {
+    btnSave.addEventListener("click", async () => {
+      const cfg = collectAutoExportConfigFromUI();
+      try {
+        btnSave.disabled = true;
+        btnSave.textContent = "Saving...";
+        const res = await fetch("/api/auto-export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(cfg),
+        });
+        if (!res.ok) throw new Error("HTTP error " + res.status);
+        const data = await res.json();
+        currentAutoExportConfig = data.config;
+        syncAutoExportUI(currentAutoExportConfig);
+        showToast("Auto-export settings saved successfully");
+      } catch (err) {
+        console.error("Failed to save auto-export config:", err);
+        showToast("Failed to save auto-export settings");
+      } finally {
+        btnSave.disabled = false;
+        btnSave.textContent = "Save Auto-Export Settings";
+      }
+    });
+  }
+
+  // Test Export button
+  const btnTest = document.getElementById("btn-test-auto-export");
+  if (btnTest) {
+    btnTest.addEventListener("click", async () => {
+      try {
+        btnTest.disabled = true;
+        btnTest.textContent = "Exporting...";
+        showToast("Generating auto-export file...");
+
+        // Save current settings first before running test
+        const cfg = collectAutoExportConfigFromUI();
+        await fetch("/api/auto-export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(cfg),
+        });
+
+        const res = await fetch("/api/auto-export/run-now", { method: "POST" });
+        if (!res.ok) throw new Error("HTTP error " + res.status);
+        const data = await res.json();
+        if (data.success) {
+          syncAutoExportUI(data.config);
+          showToast(`Exported ${data.count} apps to ${data.file_path}`);
+        } else {
+          showToast(`Export error: ${data.message}`);
+        }
+      } catch (err) {
+        console.error("Failed to run test export:", err);
+        showToast("Failed to run test export");
+      } finally {
+        btnTest.disabled = false;
+        btnTest.textContent = "Test Export Now";
+      }
+    });
+  }
+
+  // Tab switching in Export Modal
+  const tabManual = document.getElementById("tab-btn-export-manual");
+  if (tabManual) {
+    tabManual.addEventListener("click", () => switchExportModalTab("manual"));
+  }
+  const tabAuto = document.getElementById("tab-btn-export-auto");
+  if (tabAuto) {
+    tabAuto.addEventListener("click", () => switchExportModalTab("auto"));
+  }
+
+  // Cancel / Close button in Auto-Export tab
+  const btnCancelAutoExport = document.getElementById("auto-export-cancel-btn");
+  if (btnCancelAutoExport) {
+    btnCancelAutoExport.addEventListener("click", () => closeExportModal());
+  }
+
+  loadAutoExportConfig();
 }

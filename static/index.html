@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon.png">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="stylesheet" href="/static/styles.css?v=0.6.9">
+  <link rel="stylesheet" href="/static/styles.css?v=0.7.0">
 
 </head>
 <body>
@@ -27,7 +27,7 @@
         </div>
         <div class="brand-text">
           <h1>AppIndex</h1>
-          <span class="brand-version" id="brand-app-version">v0.5.4</span>
+          <span class="brand-version" id="brand-app-version">v0.5.5</span>
         </div>
       </div>
 
@@ -79,7 +79,7 @@
            rel="noopener noreferrer"
            class="btn btn-secondary btn-sm nav-github-btn"
            id="nav-github-link"
-           title="GitHub Repository (v0.5.4)">
+           title="GitHub Repository (v0.5.5)">
           <svg class="nav-github-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
           </svg>
@@ -375,7 +375,7 @@
             <div>
               <div class="settings-title-row">
                 <h2>Application Settings</h2>
-                <span class="settings-version-tag" id="settings-app-version">v0.5.4</span>
+                <span class="settings-version-tag" id="settings-app-version">v0.5.5</span>
               </div>
               <span class="modal-subtitle">Customize themes, view density, and typography scaling</span>
             </div>
@@ -677,7 +677,7 @@
             </div>
           </div>
 
-          <!-- Section 6: Integrations & Updates -->
+          <!-- Section 6: Navigation Links & Updates -->
           <div class="settings-section">
             <h3 class="settings-section-title">Navigation Links &amp; Updates</h3>
 
@@ -837,7 +837,15 @@
           <button id="export-close-btn" class="modal-close" title="Close dialog">&times;</button>
         </div>
 
-        <!-- Export Preset Toolbar (Sub-Header) -->
+        <!-- Export Mode Tabs -->
+        <div class="export-mode-tabs">
+          <button type="button" class="export-mode-tab active" id="tab-btn-export-manual">Manual Download</button>
+          <button type="button" class="export-mode-tab" id="tab-btn-export-auto">Auto-Export Schedule</button>
+        </div>
+
+        <!-- Tab View 1: Manual Export View -->
+        <div id="export-manual-view">
+          <!-- Export Preset Toolbar (Sub-Header) -->
         <div class="export-preset-bar">
           <div class="export-preset-info">
             <span class="export-preset-label">Export Defaults:</span>
@@ -1045,6 +1053,272 @@
           </div>
         </div>
       </div>
+
+      <!-- Tab View 2: Automated Application Export View -->
+      <div id="export-auto-view" style="display: none;">
+        <div class="export-modal-body">
+          <!-- Master Toggle Section -->
+          <div class="settings-section">
+            <div class="section-title-row">
+              <div>
+                <h3 class="settings-section-title">Automated Application Export</h3>
+                <span class="settings-section-desc">Automatically export inventory records to local storage on a schedule or after every rescan</span>
+              </div>
+              <label class="toggle-label" for="toggle-auto-export">
+                <input type="checkbox" id="toggle-auto-export">
+                <span class="toggle-slider"></span>
+                <span class="toggle-text">Enable Auto-Export</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Configuration Panel (Visible when enabled) -->
+          <div id="auto-export-config-panel" style="display: none; flex-direction: column; gap: 14px;">
+            <!-- Section 1: Schedule & File Output Options -->
+            <div class="settings-section">
+              <h3 class="settings-section-title">1. Schedule &amp; Format Options</h3>
+              <p class="settings-section-desc">Set frequency, retention pruning count, file format, and naming style.</p>
+              <div class="auto-export-grid-2x2">
+                <div class="auto-export-field-group">
+                  <label for="auto-export-frequency" class="settings-label">Frequency:</label>
+                  <select id="auto-export-frequency" class="input-select">
+                    <option value="every_6h">Every 6 Hours</option>
+                    <option value="every_12h">Every 12 Hours</option>
+                    <option value="daily" selected>Daily (Every 24 Hours)</option>
+                    <option value="every_3d">Every 3 Days</option>
+                    <option value="weekly">Weekly (Every 7 Days)</option>
+                    <option value="on_rescan">On Every System Rescan</option>
+                  </select>
+                </div>
+                <div class="auto-export-field-group">
+                  <label for="auto-export-prune" class="settings-label">Prune Old Exports:</label>
+                  <select id="auto-export-prune" class="input-select">
+                    <option value="5">Keep Last 5</option>
+                    <option value="10" selected>Keep Last 10</option>
+                    <option value="25">Keep Last 25</option>
+                    <option value="50">Keep Last 50</option>
+                    <option value="0">Keep All (No Pruning)</option>
+                  </select>
+                </div>
+                <div class="auto-export-field-group">
+                  <label for="auto-export-format" class="settings-label">Format:</label>
+                  <select id="auto-export-format" class="input-select">
+                    <option value="csv" selected>CSV (.csv)</option>
+                    <option value="json">JSON (.json)</option>
+                  </select>
+                </div>
+                <div class="auto-export-field-group">
+                  <label for="auto-export-pattern" class="settings-label">Filename Pattern:</label>
+                  <select id="auto-export-pattern" class="input-select">
+                    <option value="both" selected>Both (Timestamped + Latest)</option>
+                    <option value="timestamped">Timestamped Only</option>
+                    <option value="latest">Latest Only (Overwrite)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 2: Destination Directory -->
+            <div class="settings-section">
+              <h3 class="settings-section-title">2. Save Directory</h3>
+              <p class="settings-section-desc">Local folder where automated backup exports will be stored.</p>
+              <div class="auto-export-dest-input-row">
+                <input type="text" id="auto-export-dest" class="input-text" placeholder="~/Documents/AppIndex_Exports" spellcheck="false">
+                <button type="button" id="btn-auto-export-reset-dir" class="btn btn-outline btn-xs" title="Reset to default export directory">Reset</button>
+              </div>
+              <span class="settings-field-hint" style="margin-top: 6px; display: block;">Relative paths like ~/... resolve to your home folder. Created automatically if missing.</span>
+            </div>
+
+            <!-- Section 3: Package Sources -->
+            <div class="settings-section">
+              <div class="export-section-header">
+                <div>
+                  <h3 class="settings-section-title">3. Package Sources to Include</h3>
+                  <p class="settings-section-desc">Choose which packaging formats and origins to export.</p>
+                </div>
+                <div class="export-header-actions">
+                  <button type="button" id="btn-auto-export-src-all" class="btn btn-outline btn-xs">All</button>
+                  <button type="button" id="btn-auto-export-src-none" class="btn btn-outline btn-xs">Clear</button>
+                </div>
+              </div>
+              <div class="export-checkbox-grid">
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-source" value="native" checked>
+                  <span>Native Repositories (dnf/rpm)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-source" value="flatpak" checked>
+                  <span>Flatpak</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-source" value="appimage" checked>
+                  <span>AppImage</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-source" value="steam" checked>
+                  <span>Steam</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-source" value="local" checked>
+                  <span>Local User Applications</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-source" value="unmanaged" checked>
+                  <span>Unmanaged / Other Desktop Files</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Section 4: Visibility Filter -->
+            <div class="settings-section">
+              <h3 class="settings-section-title">4. Menu Visibility</h3>
+              <p class="settings-section-desc">Filter applications based on system menu appearance.</p>
+              <div class="export-radio-group">
+                <label class="export-radio-item">
+                  <input type="radio" name="auto-export-visibility" value="all" checked>
+                  <span>All Applications</span>
+                </label>
+                <label class="export-radio-item">
+                  <input type="radio" name="auto-export-visibility" value="in_menu">
+                  <span>Menu Visible Only</span>
+                </label>
+                <label class="export-radio-item">
+                  <input type="radio" name="auto-export-visibility" value="hidden">
+                  <span>Hidden Only</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Section 5: Columns / Fields Selection -->
+            <div class="settings-section">
+              <div class="export-section-header">
+                <div>
+                  <h3 class="settings-section-title">5. Columns to Include</h3>
+                  <p class="settings-section-desc">Select which data fields are included in each export entry.</p>
+                </div>
+                <div class="export-header-actions">
+                  <button type="button" id="btn-auto-export-fields-all" class="btn btn-outline btn-xs">All</button>
+                  <button type="button" id="btn-auto-export-fields-default" class="btn btn-outline btn-xs">Defaults</button>
+                  <button type="button" id="btn-auto-export-fields-none" class="btn btn-outline btn-xs">Clear</button>
+                </div>
+              </div>
+              <div class="export-checkbox-grid">
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="name" checked data-default="true">
+                  <span>Application Name (name)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="source_label" checked data-default="true">
+                  <span>Source Label (source_label)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="package_name" checked data-default="true">
+                  <span>Package Name (package_name)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="package_version" checked data-default="true">
+                  <span>Version (package_version)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="installed_size" checked data-default="true">
+                  <span>Installed Size (installed_size)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="in_menu" checked data-default="true">
+                  <span>Menu Visible (in_menu)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="primary_category" checked data-default="true">
+                  <span>Primary Category (primary_category)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="exec_command">
+                  <span>Exec Command (exec_command)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="desktop_path">
+                  <span>Desktop Path (desktop_path)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="uninstall_command">
+                  <span>Uninstall Command (uninstall_command)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="generic_name">
+                  <span>Generic Name (generic_name)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="comment">
+                  <span>Comment / Description (comment)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="package_arch">
+                  <span>Architecture (package_arch)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="source_type">
+                  <span>Source Type (source_type)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="categories">
+                  <span>All Categories (categories)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="install_date">
+                  <span>Last Updated (install_date)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="last_used_date">
+                  <span>Last Opened (last_used_date)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="launch_count">
+                  <span>Launch Count (launch_count)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="version_transition">
+                  <span>Version Transition (version_transition)</span>
+                </label>
+                <label class="export-check-item">
+                  <input type="checkbox" name="auto-export-field" value="uninstall_note">
+                  <span>Uninstall Note (uninstall_note)</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Section 6: Status & Last Export Info -->
+            <div class="settings-section">
+              <h3 class="settings-section-title">6. Export History &amp; Status</h3>
+              <div class="auto-export-status-card" style="margin-top: 8px;">
+                <div class="auto-export-status-row">
+                  <span class="auto-export-status-label">Last Run:</span>
+                  <span id="auto-export-last-run" class="auto-export-status-val">Never executed</span>
+                </div>
+                <div class="auto-export-status-row" id="auto-export-retained-row">
+                  <span class="auto-export-status-label">Retained:</span>
+                  <span id="auto-export-retained-count" class="auto-export-status-val">0 files</span>
+                </div>
+                <div class="auto-export-status-row" id="auto-export-file-row" style="display: none;">
+                  <span class="auto-export-status-label">Last File:</span>
+                  <span id="auto-export-last-file" class="auto-export-status-file"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer export-modal-footer">
+          <div class="export-summary-text">
+            Auto-export runs in background via AppIndex daemon
+          </div>
+          <div class="export-footer-actions">
+            <button type="button" id="auto-export-cancel-btn" class="btn btn-secondary">Close</button>
+            <button type="button" id="btn-test-auto-export" class="btn btn-outline btn-sm">Test Export Now</button>
+            <button type="button" id="btn-save-auto-export" class="btn btn-primary">Save Schedule</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
     <!-- Update Progress Modal -->
     <div id="update-progress-modal" class="modal-backdrop update-modal-backdrop" style="display: none;">
       <div class="modal-content update-modal-content">
@@ -1065,6 +1339,6 @@
     <div id="toast" class="toast" style="display: none;"></div>
   </div>
 
-  <script src="/static/app.js?v=0.6.9"></script>
+  <script src="/static/app.js?v=0.7.0"></script>
 </body>
 </html>
