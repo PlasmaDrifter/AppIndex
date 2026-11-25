@@ -27,9 +27,10 @@ from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
 except ImportError:
     Image = None
+    ImageOps = None
 
 from scanner import scan_all_applications
 from usage_tracker import start_background_usage_sync
@@ -44,8 +45,14 @@ from auto_exporter import (
 
 logger = logging.getLogger("appindex.server")
 
-APP_VERSION = "0.5.7"
+APP_VERSION = "0.5.8"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
+
+
+def _warm_startup_caches() -> None:
+    """Scan applications and pre-resolve/thumbnail their icons in the background."""
+    data = get_cached_or_scan(force_refresh=False)
+    prewarm_application_icons(data.get("applications", []))
 
 
 @asynccontextmanager
@@ -53,7 +60,7 @@ async def lifespan(_app: FastAPI):
     """Manage background usage sync, auto-export scheduler, and non-blocking cache warm-up."""
     start_background_usage_sync()
     start_auto_export_scheduler()
-    threading.Thread(target=get_cached_or_scan, kwargs={"force_refresh": False}, daemon=True).start()
+    threading.Thread(target=_warm_startup_caches, daemon=True).start()
     try:
         yield
     finally:
@@ -78,6 +85,7 @@ async def add_static_no_cache_headers(request: Request, call_next):
 
 # Thread-safe in-memory caches
 _CACHE_LOCK = threading.RLock()
+_THEME_BUILD_LOCKS: Dict[str, threading.Lock] = {}
 _CACHED_DATA: Optional[Dict[str, Any]] = None
 _CACHED_RECENT_HOURS: int = 48
 _CACHED_DNF_HOURS: int = 48
@@ -85,10 +93,16 @@ _CACHED_ALLOWED_ICON_DIRS: Optional[Tuple[str, ...]] = None
 _CACHED_ALLOWED_DESKTOP_DIRS: Optional[Tuple[str, ...]] = None
 _RESOLVED_ICON_CACHE: Dict[str, Optional[str]] = {}
 _XPM_CACHE: Dict[str, bytes] = {}
+_THUMB_CACHE: Dict[str, bytes] = {}
+_ICON_BYTES_CACHE: Dict[str, Tuple[bytes, str]] = {}
 _THEME_INDEX_CACHE: Dict[str, Dict[str, str]] = {}
 _FLAT_ICON_INDEX: Optional[Dict[str, str]] = None
 _APPSTREAM_ICON_INDEX: Optional[Dict[str, str]] = None
 _ORDERED_THEMES_CACHE: Optional[List[str]] = None
+_THUMB_THRESHOLD_BYTES = 32 * 1024
+_ICON_MEM_CACHE_MAX_BYTES = 256 * 1024
+_THUMB_MAX_SIZE = (96, 96)
+_RASTER_THUMB_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".ico")
 
 
 def parse_version_tuple(ver_str: str):
@@ -326,10 +340,28 @@ def _clear_icon_caches() -> None:
     _CACHED_ALLOWED_ICON_DIRS = None
     _RESOLVED_ICON_CACHE.clear()
     _XPM_CACHE.clear()
+    _THUMB_CACHE.clear()
+    _ICON_BYTES_CACHE.clear()
     _THEME_INDEX_CACHE.clear()
     _FLAT_ICON_INDEX = None
     _APPSTREAM_ICON_INDEX = None
     _ORDERED_THEMES_CACHE = None
+
+
+def prewarm_application_icons(apps: List[Dict[str, Any]]) -> None:
+    """Pre-resolve application icons, thumbnails, and small icon payloads in memory."""
+    seen: Set[str] = set()
+    for app_item in apps:
+        ic = app_item.get("icon")
+        if not ic or ic in seen:
+            continue
+        seen.add(ic)
+        try:
+            resolved = resolve_icon_path(ic)
+            if resolved:
+                _get_cached_icon_payload(resolved)
+        except Exception:
+            continue
 
 
 def get_cached_or_scan(force_refresh: bool = False, recent_hours: Optional[int] = None) -> Dict[str, Any]:
@@ -626,6 +658,16 @@ _FALLBACK_SKIP_ICON_SUBDIRS = _SKIP_ICON_SUBDIRS | frozenset({"actions", "emblem
 _PRIMARY_ICON_THEMES_LIMIT = 4
 
 
+def _get_theme_lock(cache_key: str) -> threading.Lock:
+    """Return a single-flight lock for building one icon theme index."""
+    with _CACHE_LOCK:
+        lock = _THEME_BUILD_LOCKS.get(cache_key)
+        if lock is None:
+            lock = threading.Lock()
+            _THEME_BUILD_LOCKS[cache_key] = lock
+        return lock
+
+
 def _get_theme_index(theme_name: str, skip_actions: bool = False) -> Dict[str, str]:
     """Build or retrieve a compact stem -> best icon path index for a single XDG theme."""
     cache_key = f"{theme_name}:{'noact' if skip_actions else 'full'}"
@@ -633,75 +675,68 @@ def _get_theme_index(theme_name: str, skip_actions: bool = False) -> Dict[str, s
         if cache_key in _THEME_INDEX_CACHE:
             return _THEME_INDEX_CACHE[cache_key]
 
-    scored: Dict[str, Tuple[int, str]] = {}
-    allowed_dirs = get_allowed_icon_dirs()
-    home_prefix = os.path.expanduser("~")
-    skip_dirs = _FALLBACK_SKIP_ICON_SUBDIRS if skip_actions else _SKIP_ICON_SUBDIRS
+    with _get_theme_lock(cache_key):
+        with _CACHE_LOCK:
+            if cache_key in _THEME_INDEX_CACHE:
+                return _THEME_INDEX_CACHE[cache_key]
 
-    for root in ICON_ROOT_DIRS:
-        tdir = os.path.join(root, theme_name)
-        if not os.path.isdir(tdir):
-            continue
-        is_user_override = root.startswith(home_prefix)
-        for dirpath, dirnames, filenames in os.walk(tdir):
-            dirnames[:] = [d for d in dirnames if d.lower() not in skip_dirs]
-            if not filenames:
+        scored: Dict[str, Tuple[int, str]] = {}
+        home_prefix = os.path.expanduser("~")
+        skip_dirs = _FALLBACK_SKIP_ICON_SUBDIRS if skip_actions else _SKIP_ICON_SUBDIRS
+
+        for root in ICON_ROOT_DIRS:
+            tdir = os.path.join(root, theme_name)
+            if not os.path.isdir(tdir):
                 continue
-
-            real_dir = os.path.realpath(dirpath)
-            if not (real_dir + os.sep).startswith(allowed_dirs):
-                continue
-
-            rel = dirpath[len(tdir) :].lower()
-            base_score = 1000 if is_user_override else 0
-            if "apps" in rel:
-                base_score += 200
-            elif "categories" in rel or "preferences" in rel or "devices" in rel or "places" in rel:
-                base_score += 100
-
-            if "48x48" in rel or "/48" in rel or "64x64" in rel or "/64" in rel:
-                base_score += 40
-            elif "scalable" in rel or "128x128" in rel or "/128" in rel:
-                base_score += 35
-            elif "32x32" in rel or "/32" in rel or "256x256" in rel or "/256" in rel:
-                base_score += 25
-            elif "24x24" in rel or "22x22" in rel or "16x16" in rel:
-                base_score += 5
-
-            for fn in filenames:
-                stem, ext = os.path.splitext(fn)
-                ext_l = ext.lower()
-                if ext_l not in ALLOWED_IMAGE_EXTENSIONS:
+            is_user_override = root.startswith(home_prefix)
+            for dirpath, dirnames, filenames in os.walk(tdir):
+                dirnames[:] = [d for d in dirnames if d.lower() not in skip_dirs]
+                if not filenames:
                     continue
-                score = base_score
-                if ext_l == ".svg":
-                    score += 6
-                elif ext_l == ".png":
-                    score += 5
-                elif ext_l == ".webp":
-                    score += 4
-                elif ext_l in (".jpg", ".jpeg"):
-                    score += 3
-                elif ext_l == ".ico":
-                    score += 2
-                else:
-                    score += 1
 
-                prev = scored.get(stem)
-                if prev is None or score > prev[0]:
-                    full_path = os.path.join(dirpath, fn)
-                    if os.path.islink(full_path):
-                        candidate = os.path.realpath(full_path)
-                        if not candidate.startswith(allowed_dirs):
-                            continue
+                rel = dirpath[len(tdir) :].lower()
+                base_score = 1000 if is_user_override else 0
+                if "apps" in rel:
+                    base_score += 200
+                elif "categories" in rel or "preferences" in rel or "devices" in rel or "places" in rel:
+                    base_score += 100
+
+                if "48x48" in rel or "/48" in rel or "64x64" in rel or "/64" in rel:
+                    base_score += 40
+                elif "scalable" in rel or "128x128" in rel or "/128" in rel:
+                    base_score += 35
+                elif "32x32" in rel or "/32" in rel or "256x256" in rel or "/256" in rel:
+                    base_score += 25
+                elif "24x24" in rel or "22x22" in rel or "16x16" in rel:
+                    base_score += 5
+
+                for fn in filenames:
+                    stem, ext = os.path.splitext(fn)
+                    ext_l = ext.lower()
+                    if ext_l not in ALLOWED_IMAGE_EXTENSIONS:
+                        continue
+                    score = base_score
+                    if ext_l == ".svg":
+                        score += 6
+                    elif ext_l == ".png":
+                        score += 5
+                    elif ext_l == ".webp":
+                        score += 4
+                    elif ext_l in (".jpg", ".jpeg"):
+                        score += 3
+                    elif ext_l == ".ico":
+                        score += 2
                     else:
-                        candidate = os.path.join(real_dir, fn)
-                    scored[stem] = (score, candidate)
+                        score += 1
 
-    result = {k: v[1] for k, v in scored.items()}
-    with _CACHE_LOCK:
-        _THEME_INDEX_CACHE[cache_key] = result
-    return result
+                    prev = scored.get(stem)
+                    if prev is None or score > prev[0]:
+                        scored[stem] = (score, os.path.join(dirpath, fn))
+
+        result = {k: v[1] for k, v in scored.items()}
+        with _CACHE_LOCK:
+            _THEME_INDEX_CACHE[cache_key] = result
+        return result
 
 
 def find_flatpak_appstream_icon(clean_name: str, allowed_dirs: Tuple[str, ...]) -> Optional[str]:
@@ -756,24 +791,70 @@ def _resolve_icon_path_uncached(icon_name_or_path: str) -> Optional[str]:
     flat_idx = _get_flat_icon_index()
     for key in lookup_keys:
         hit = flat_idx.get(key)
-        if hit and hit.startswith(allowed_dirs) and os.path.isfile(hit):
-            return hit
+        if hit:
+            canonical = os.path.realpath(hit)
+            if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS) and canonical.startswith(allowed_dirs) and os.path.isfile(canonical):
+                return canonical
 
-    # 2. Search ordered themes lazily (active user theme + inherits -> hicolor -> common themes)
-    for idx, theme in enumerate(_get_ordered_icon_themes()):
-        theme_idx = _get_theme_index(theme, skip_actions=(idx >= _PRIMARY_ICON_THEMES_LIMIT))
+    themes = _get_ordered_icon_themes()
+
+    # 2. Search primary themes (active theme + inherits + hicolor)
+    for idx, theme in enumerate(themes[:_PRIMARY_ICON_THEMES_LIMIT]):
+        theme_idx = _get_theme_index(theme, skip_actions=False)
         for key in lookup_keys:
             hit = theme_idx.get(key)
-            if hit and hit.startswith(allowed_dirs) and os.path.isfile(hit):
-                return hit
+            if hit:
+                canonical = os.path.realpath(hit)
+                if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS) and canonical.startswith(allowed_dirs) and os.path.isfile(canonical):
+                    return canonical
 
-    # 3. Search in Flatpak AppStream icon cache
+    # 3. Check Flatpak AppStream icon cache before walking slower fallback themes (e.g. Papirus, oxygen)
     for key in lookup_keys:
         appstream_icon = find_flatpak_appstream_icon(key, allowed_dirs)
         if appstream_icon:
             return appstream_icon
 
+    # 4. Search remaining fallback themes
+    for theme in themes[_PRIMARY_ICON_THEMES_LIMIT:]:
+        theme_idx = _get_theme_index(theme, skip_actions=True)
+        for key in lookup_keys:
+            hit = theme_idx.get(key)
+            if hit:
+                canonical = os.path.realpath(hit)
+                if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS) and canonical.startswith(allowed_dirs) and os.path.isfile(canonical):
+                    return canonical
+
     return None
+
+
+def get_raster_thumbnail_bytes(canonical_path: str) -> Optional[bytes]:
+    """Downscale oversized raster icons (>32 KB) to 96x96 PNG and cache in memory."""
+    if Image is None:
+        return None
+
+    with _CACHE_LOCK:
+        if canonical_path in _THUMB_CACHE:
+            return _THUMB_CACHE[canonical_path]
+
+    try:
+        if os.path.getsize(canonical_path) <= _THUMB_THRESHOLD_BYTES:
+            return None
+        with Image.open(canonical_path) as im:
+            if ImageOps is not None:
+                im = ImageOps.exif_transpose(im)
+            if im.width <= _THUMB_MAX_SIZE[0] and im.height <= _THUMB_MAX_SIZE[1] and canonical_path.endswith(".png"):
+                return None
+            if im.mode not in ("RGBA", "RGB"):
+                im = im.convert("RGBA")
+            im.thumbnail(_THUMB_MAX_SIZE, Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            im.save(buf, format="PNG", optimize=True)
+            thumb_bytes = buf.getvalue()
+        with _CACHE_LOCK:
+            _THUMB_CACHE[canonical_path] = thumb_bytes
+        return thumb_bytes
+    except Exception:
+        return None
 
 
 def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
@@ -911,6 +992,7 @@ def refresh_apps(recent_hours: Optional[int] = Query(None, ge=1, le=8760)):
     """Force re-scan of the system applications."""
     start_background_usage_sync()
     result = get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
+    threading.Thread(target=prewarm_application_icons, args=(result.get("applications", []),), daemon=True).start()
     on_inventory_rescan(result.get("applications", []))
     return result
 
@@ -920,8 +1002,60 @@ def scan_apps_alias(recent_hours: Optional[int] = Query(None, ge=1, le=8760)):
     """Alias for /api/refresh for CLI compat."""
     start_background_usage_sync()
     result = get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
+    threading.Thread(target=prewarm_application_icons, args=(result.get("applications", []),), daemon=True).start()
     on_inventory_rescan(result.get("applications", []))
     return result
+
+
+def _guess_icon_mime(canonical: str) -> str:
+    mime, _ = mimetypes.guess_type(canonical)
+    if mime:
+        return mime
+    if canonical.endswith(".svg"):
+        return "image/svg+xml"
+    if canonical.endswith(".png"):
+        return "image/png"
+    if canonical.endswith(".xpm"):
+        return "image/x-xpixmap"
+    return "application/octet-stream"
+
+
+def _get_cached_icon_payload(canonical: str) -> Optional[Tuple[bytes, str]]:
+    """Return cached (bytes, mime_type) for thumbnails, XPMs, or small icons <=256 KB."""
+    with _CACHE_LOCK:
+        if canonical in _ICON_BYTES_CACHE:
+            return _ICON_BYTES_CACHE[canonical]
+
+    if not os.path.isfile(canonical):
+        return None
+
+    if canonical.endswith(".xpm"):
+        png_bytes = convert_xpm_to_png(canonical)
+        if png_bytes:
+            payload = (png_bytes, "image/png")
+            with _CACHE_LOCK:
+                _ICON_BYTES_CACHE[canonical] = payload
+            return payload
+
+    if canonical.endswith(_RASTER_THUMB_EXTS):
+        thumb_bytes = get_raster_thumbnail_bytes(canonical)
+        if thumb_bytes:
+            payload = (thumb_bytes, "image/png")
+            with _CACHE_LOCK:
+                _ICON_BYTES_CACHE[canonical] = payload
+            return payload
+
+    try:
+        if os.path.getsize(canonical) <= _ICON_MEM_CACHE_MAX_BYTES:
+            with open(canonical, "rb") as f:
+                raw = f.read()
+            payload = (raw, _guess_icon_mime(canonical))
+            with _CACHE_LOCK:
+                _ICON_BYTES_CACHE[canonical] = payload
+            return payload
+    except OSError:
+        pass
+    return None
 
 
 @app.api_route("/api/icon", methods=["GET", "HEAD"])
@@ -938,24 +1072,12 @@ def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Query(None
         if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS):
             allowed_dirs = get_allowed_icon_dirs()
             if canonical.startswith(allowed_dirs):
+                cached = _get_cached_icon_payload(canonical)
+                if cached:
+                    raw, mime = cached
+                    return Response(content=raw, media_type=mime, headers=ICON_CACHE_HEADERS)
                 if os.path.isfile(canonical):
-                    # Convert legacy .xpm to browser-compatible .png on the fly
-                    if canonical.endswith(".xpm"):
-                        png_bytes = convert_xpm_to_png(canonical)
-                        if png_bytes:
-                            return Response(content=png_bytes, media_type="image/png", headers=ICON_CACHE_HEADERS)
-
-                    mime, _ = mimetypes.guess_type(canonical)
-                    if not mime:
-                        if canonical.endswith(".svg"):
-                            mime = "image/svg+xml"
-                        elif canonical.endswith(".png"):
-                            mime = "image/png"
-                        elif canonical.endswith(".xpm"):
-                            mime = "image/x-xpixmap"
-                        else:
-                            mime = "application/octet-stream"
-                    return FileResponse(canonical, media_type=mime, headers=ICON_CACHE_HEADERS)
+                    return FileResponse(canonical, media_type=_guess_icon_mime(canonical), headers=ICON_CACHE_HEADERS)
 
     return Response(content=FALLBACK_SVG, media_type="image/svg+xml", headers=ICON_CACHE_HEADERS)
 

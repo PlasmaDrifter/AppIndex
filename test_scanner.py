@@ -619,6 +619,30 @@ class TestRegressionFixes(unittest.TestCase):
             err = client.get("/api/desktop-content?path=/usr/share/applications/dummy.desktop")
             self.assertEqual(err.status_code, 500)
 
+    def test_oversized_raster_icon_thumbnailing(self):
+        import io
+        import tempfile
+        from PIL import Image
+        import server
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+            tmp_png = tf.name
+        try:
+            # Generate an oversized (>32 KB) noisy 512x512 PNG
+            img = Image.effect_noise((512, 512), 64).convert("RGBA")
+            img.save(tmp_png, format="PNG")
+            self.assertGreater(os.path.getsize(tmp_png), 32 * 1024)
+
+            thumb = server.get_raster_thumbnail_bytes(tmp_png)
+            self.assertIsNotNone(thumb)
+            self.assertLess(len(thumb), os.path.getsize(tmp_png))
+            with Image.open(io.BytesIO(thumb)) as out_im:
+                self.assertLessEqual(out_im.width, 96)
+                self.assertLessEqual(out_im.height, 96)
+        finally:
+            if os.path.exists(tmp_png):
+                os.remove(tmp_png)
+
 
 if __name__ == "__main__":
     unittest.main()

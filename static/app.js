@@ -322,7 +322,12 @@ let activeModalApp = null;
 
 const SORT_TEXT_COLLATOR = new Intl.Collator(undefined, { sensitivity: "base" });
 const SORT_VERSION_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const FALLBACK_ICON_DATA_URI = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='48' height='48' fill='none' stroke='%238892b0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='3' ry='3'/%3E%3Cline x1='9' y1='9' x2='15' y2='15'/%3E%3Cline x1='15' y1='9' x2='9' y2='15'/%3E%3C/svg%3E";
 let searchDebounceTimer = null;
+
+function getAppIconUrl(app) {
+  return app && app.icon ? `/api/icon?name=${encodeURIComponent(app.icon)}` : FALLBACK_ICON_DATA_URI;
+}
 
 function getEffectiveRecentHours() {
   return (appStats && appStats.recent_hours) || userSettings.recentHours || 48;
@@ -1190,9 +1195,8 @@ function renderCards(apps) {
     card.className = "app-card" + (app.is_recent_update ? " card-recently-updated" : "");
     card.dataset.index = idx;
 
-    const iconUrl = app.icon
-      ? `/api/icon?name=${encodeURIComponent(app.icon)}`
-      : "/api/icon";
+    const iconUrl = getAppIconUrl(app);
+    const imgLoadAttr = idx < 25 ? 'fetchpriority="high"' : 'loading="lazy"';
 
     const badgeClass = `badge-source-${app.source_type}`;
     const menuBadgeClass = app.in_menu ? "badge-menu" : "badge-hidden";
@@ -1210,7 +1214,7 @@ function renderCards(apps) {
     card.innerHTML = `
       <div>
         <div class="card-top">
-          <img class="app-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/api/icon'">
+          <img class="app-icon" src="${iconUrl}" alt="" width="38" height="38" decoding="async" ${imgLoadAttr} onerror="this.onerror=null;this.src=FALLBACK_ICON_DATA_URI">
           <div class="card-header-info">
             <div class="card-title-row">
               <h3 class="app-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</h3>
@@ -1303,9 +1307,8 @@ function renderTable(apps) {
     }
     tr.dataset.index = idx;
 
-    const iconUrl = app.icon
-      ? `/api/icon?name=${encodeURIComponent(app.icon)}`
-      : "/api/icon";
+    const iconUrl = getAppIconUrl(app);
+    const imgLoadAttr = idx < 25 ? 'fetchpriority="high"' : 'loading="lazy"';
 
     const badgeClass = `badge-source-${app.source_type}`;
 
@@ -1359,7 +1362,7 @@ function renderTable(apps) {
 
     tr.innerHTML = `
       <td class="col-icon">
-        <img class="table-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/api/icon'">
+        <img class="table-icon" src="${iconUrl}" alt="" width="32" height="32" decoding="async" ${imgLoadAttr} onerror="this.onerror=null;this.src=FALLBACK_ICON_DATA_URI">
       </td>
       <td class="col-app-name">
         <div class="table-app-title-row">
@@ -1424,13 +1427,11 @@ function renderTable(apps) {
 function openModal(app) {
   activeModalApp = app;
 
-  const iconUrl = app.icon
-    ? `/api/icon?name=${encodeURIComponent(app.icon)}`
-    : "/api/icon";
+  const iconUrl = getAppIconUrl(app);
 
   modalAppIcon.onerror = function () {
     this.onerror = null;
-    this.src = "/api/icon";
+    this.src = FALLBACK_ICON_DATA_URI;
   };
   modalAppIcon.src = iconUrl;
   modalAppName.textContent = app.name;
