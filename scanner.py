@@ -1456,6 +1456,9 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         app_primary_cat = data["primary_category"]
         if app_menu_categories:
             app_primary_cat = app_menu_categories[0]
+        elif is_helper:
+            # Put hidden/helper entries in dedicated Hidden category while keeping raw desktop categories
+            app_primary_cat = "Hidden"
 
         app_id = f"{scope}:{fname}"
         applications.append(

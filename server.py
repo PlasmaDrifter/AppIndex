@@ -45,7 +45,7 @@ from auto_exporter import (
 
 logger = logging.getLogger("appindex.server")
 
-APP_VERSION = "0.5.8"
+APP_VERSION = "0.5.9"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
 

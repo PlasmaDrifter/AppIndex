@@ -647,14 +647,23 @@ class TestRegressionFixes(unittest.TestCase):
     def test_menu_hidden_apps_not_marked_as_helpers(self):
         res = scan_all_applications()
         apps = res["applications"]
+        helper_apps = []
         # Real GUI apps hidden via kmenuedit .hidden stay off the menu (in_menu=False) but are not helpers
         for app_item in apps:
             if app_item.get("no_display") or app_item.get("hidden"):
                 self.assertTrue(app_item["is_helper"])
                 self.assertFalse(app_item["in_menu"])
+            if app_item.get("is_helper"):
+                helper_apps.append(app_item)
+                self.assertFalse(app_item["in_menu"])
+                self.assertEqual(app_item.get("primary_category"), "Hidden")
+            else:
+                self.assertNotEqual(app_item.get("primary_category"), "Hidden")
             if app_item.get("scope") == "standalone":
                 self.assertFalse(app_item["is_helper"])
                 self.assertFalse(app_item["in_menu"])
+        self.assertGreater(len(helper_apps), 0)
+        self.assertTrue(any(app_item.get("categories") for app_item in helper_apps))
 
 
 if __name__ == "__main__":

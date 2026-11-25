@@ -1194,14 +1194,18 @@ function renderCards(apps) {
 
   apps.forEach((app, idx) => {
     const card = document.createElement("div");
-    card.className = "app-card" + (app.is_recent_update ? " card-recently-updated" : "");
+    card.className = [
+      "app-card",
+      app.is_recent_update ? "card-recently-updated" : "",
+      app.is_helper ? "card-hidden" : (!app.in_menu ? "card-off-menu" : ""),
+    ].filter(Boolean).join(" ");
     card.dataset.index = idx;
 
     const iconUrl = getAppIconUrl(app);
     const imgLoadAttr = idx < 25 ? 'fetchpriority="high"' : 'loading="lazy"';
 
     const badgeClass = `badge-source-${app.source_type}`;
-    const menuBadgeClass = app.in_menu ? "badge-menu" : "badge-hidden";
+    const menuBadgeClass = app.in_menu ? "badge-menu" : (app.is_helper ? "badge-hidden" : "badge-off-menu");
     const menuBadgeText = app.in_menu ? "In Menu" : (app.is_helper ? "Helper" : "Off Menu");
 
     const versionSizeStr = [app.package_version, app.installed_size].filter(Boolean).join(" • ");
@@ -1229,12 +1233,17 @@ function renderCards(apps) {
               ${(() => {
                 if (!app.primary_category) return "";
                 const primCat = app.primary_category;
+                const isHiddenCat = primCat === "Hidden";
                 const menuCats = Array.isArray(app.menu_categories) && app.menu_categories.length > 0 ? app.menu_categories : [primCat];
                 const extraCount = menuCats.length - 1;
-                const tooltip = `Menu Category: ${primCat}${extraCount > 0 ? ` (In Menu: ${menuCats.join(", ")})` : ""}`;
+                const rawTags = Array.isArray(app.categories) && app.categories.length > 0 ? app.categories.join(", ") : "";
+                const tooltip = isHiddenCat
+                  ? `Category: Hidden (Helper Entry)${rawTags ? ` • Desktop Tags: ${rawTags}` : ""}`
+                  : `${app.in_menu ? "Menu Category" : "Category (Off Menu)"}: ${primCat}${extraCount > 0 ? ` (In Menu: ${menuCats.join(", ")})` : ""}`;
+                const catBadgeClass = isHiddenCat ? "badge badge-category-hidden" : "badge badge-unmanaged";
                 return `
                   <div class="category-badge-group" title="${escapeHtml(tooltip)}">
-                    <span class="badge badge-unmanaged">${escapeHtml(primCat)}</span>
+                    <span class="${catBadgeClass}">${escapeHtml(primCat)}</span>
                     ${extraCount > 0 ? `<span class="category-badge-count" title="${escapeHtml("In Menu: " + menuCats.join(", "))}">+${extraCount}</span>` : ""}
                   </div>
                 `;
@@ -1304,8 +1313,12 @@ function renderTable(apps) {
 
   apps.forEach((app, idx) => {
     const tr = document.createElement("tr");
-    if (app.is_recent_update) {
-      tr.className = "table-row-recent";
+    const rowClasses = [
+      app.is_recent_update ? "table-row-recent" : "",
+      app.is_helper ? "table-row-hidden" : (!app.in_menu ? "table-row-off-menu" : ""),
+    ].filter(Boolean);
+    if (rowClasses.length > 0) {
+      tr.className = rowClasses.join(" ");
     }
     tr.dataset.index = idx;
 
@@ -1396,12 +1409,17 @@ function renderTable(apps) {
       <td class="col-category col-menu-status">
         ${(() => {
           const primCat = app.primary_category || "Other";
+          const isHiddenCat = primCat === "Hidden";
           const menuCats = Array.isArray(app.menu_categories) && app.menu_categories.length > 0 ? app.menu_categories : (app.primary_category ? [app.primary_category] : []);
           const extraCount = menuCats.length - 1;
-          const tooltip = `Category: ${primCat}${extraCount > 0 ? ` (In Menu: ${menuCats.join(", ")})` : ""}${app.in_menu ? " • In Menu" : " • Hidden"}`;
+          const rawTags = Array.isArray(app.categories) && app.categories.length > 0 ? app.categories.join(", ") : "";
+          const tooltip = isHiddenCat
+            ? `Category: Hidden (Helper Entry)${rawTags ? ` • Desktop Tags: ${rawTags}` : ""}`
+            : `Category: ${primCat}${extraCount > 0 ? ` (In Menu: ${menuCats.join(", ")})` : ""}${app.in_menu ? " • In Menu" : " • Off Menu"}`;
+          const catBadgeClass = isHiddenCat ? "category-badge category-badge-hidden" : "category-badge";
           return `
             <div class="category-badge-group" title="${escapeHtml(tooltip)}">
-              <span class="category-badge">${escapeHtml(primCat)}</span>
+              <span class="${catBadgeClass}">${escapeHtml(primCat)}</span>
               ${extraCount > 0 ? `<span class="category-badge-count" title="${escapeHtml("In Menu: " + menuCats.join(", "))}">+${extraCount}</span>` : ""}
             </div>
           `;
@@ -1489,7 +1507,11 @@ function openModal(app) {
   modalMenuStatus.textContent = app.in_menu
     ? "Visible in Application Menu"
     : (app.is_helper ? "Hidden / Helper Application" : "Installed App (Hidden from Application Menu)");
-  const menuCatsStr = app.menu_categories && app.menu_categories.length ? `Active Menu: ${app.menu_categories.join(", ")}` : (app.in_menu ? app.primary_category : "Not in menu");
+  const menuCatsStr = app.is_helper
+    ? "Category: Hidden (Not in menu)"
+    : (app.menu_categories && app.menu_categories.length
+        ? `Active Menu: ${app.menu_categories.join(", ")}`
+        : (app.in_menu ? (app.primary_category || "Other") : `${app.primary_category || "Other"} (Off Menu)`));
   const rawCatsStr = app.categories && app.categories.length ? `Desktop Tags: ${app.categories.join(", ")}` : "";
   modalCategory.textContent = [menuCatsStr, rawCatsStr].filter(Boolean).join(" | ");
   modalExec.textContent = app.exec_command || "N/A";

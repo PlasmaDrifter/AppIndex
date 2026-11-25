@@ -959,6 +959,19 @@ body {
   box-shadow: 0 0 0 1px var(--accent-blue), 0 6px 20px rgba(56, 189, 248, 0.18);
 }
 
+/* Subtle Card Distinction for Hidden / Helper Apps */
+.app-card.card-hidden {
+  border-color: rgba(245, 169, 127, 0.35);
+  border-color: color-mix(in srgb, var(--accent-orange, #f5a97f) 35%, var(--border-color));
+  box-shadow: inset 3px 0 0 rgba(245, 169, 127, 0.75);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-orange, #f5a97f) 75%, transparent);
+}
+
+.app-card.card-hidden:hover {
+  border-color: var(--accent-orange, #f5a97f);
+  box-shadow: inset 3px 0 0 var(--accent-orange, #f5a97f), 0 4px 16px color-mix(in srgb, var(--accent-orange, #f5a97f) 14%, transparent);
+}
+
 .badge-recent-update {
   background-color: rgba(166, 218, 149, 0.15);
   background-color: color-mix(in srgb, var(--accent-green, #a6da95) 15%, transparent);
@@ -1027,6 +1040,18 @@ body {
 
 .table-row-recent:hover {
   background-color: rgba(56, 189, 248, 0.08) !important;
+}
+
+.apps-table tbody tr.table-row-hidden {
+  background-color: rgba(245, 169, 127, 0.045);
+  background-color: color-mix(in srgb, var(--accent-orange, #f5a97f) 4.5%, transparent);
+  box-shadow: inset 3px 0 0 rgba(245, 169, 127, 0.75);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-orange, #f5a97f) 75%, transparent);
+}
+
+.apps-table tbody tr.table-row-hidden:hover {
+  background-color: rgba(245, 169, 127, 0.09);
+  background-color: color-mix(in srgb, var(--accent-orange, #f5a97f) 9%, transparent);
 }
 
 .table-version-code {
@@ -1174,10 +1199,22 @@ body {
   color: var(--accent-cyan);
 }
 
-.badge-hidden {
-  background-color: rgba(128, 135, 162, 0.12);
-  border: 1px solid rgba(128, 135, 162, 0.25);
-  color: var(--text-muted);
+.badge-hidden,
+.badge-category-hidden {
+  background-color: rgba(245, 169, 127, 0.14);
+  background-color: color-mix(in srgb, var(--accent-orange, #f5a97f) 14%, transparent);
+  border: 1px solid rgba(245, 169, 127, 0.45);
+  border: 1px solid color-mix(in srgb, var(--accent-orange, #f5a97f) 45%, transparent);
+  color: var(--accent-orange, #f5a97f);
+  font-weight: 600;
+}
+
+.badge-off-menu {
+  background-color: rgba(238, 212, 159, 0.12);
+  background-color: color-mix(in srgb, var(--accent-yellow, #eed49f) 12%, transparent);
+  border: 1px solid rgba(238, 212, 159, 0.35);
+  border: 1px solid color-mix(in srgb, var(--accent-yellow, #eed49f) 35%, transparent);
+  color: var(--accent-yellow, #eed49f);
 }
 
 /* Package Row in Card */
@@ -1648,6 +1685,16 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   user-select: none;
+}
+
+.apps-table td.col-category .category-badge.category-badge-hidden,
+.apps-table td.col-menu-status .category-badge.category-badge-hidden {
+  color: var(--accent-orange, #f5a97f);
+  background-color: rgba(245, 169, 127, 0.14);
+  background-color: color-mix(in srgb, var(--accent-orange, #f5a97f) 14%, transparent);
+  border-color: rgba(245, 169, 127, 0.45);
+  border-color: color-mix(in srgb, var(--accent-orange, #f5a97f) 45%, transparent);
+  font-weight: 600;
 }
 
 .category-badge-count {
