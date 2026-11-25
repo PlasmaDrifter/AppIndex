@@ -31,7 +31,7 @@ class TestScanner(unittest.TestCase):
         sample = apps[0]
         required_fields = [
             "id", "name", "source_type", "source_label",
-            "in_menu", "package_name", "uninstall_command",
+            "in_menu", "is_helper", "package_name", "uninstall_command",
             "install_date", "is_recent_update",
             "last_used_time", "last_used_date", "launch_count"
         ]
@@ -642,6 +642,19 @@ class TestRegressionFixes(unittest.TestCase):
         finally:
             if os.path.exists(tmp_png):
                 os.remove(tmp_png)
+
+
+    def test_menu_hidden_apps_not_marked_as_helpers(self):
+        res = scan_all_applications()
+        apps = res["applications"]
+        # Real GUI apps hidden via kmenuedit .hidden stay off the menu (in_menu=False) but are not helpers
+        for app_item in apps:
+            if app_item.get("no_display") or app_item.get("hidden"):
+                self.assertTrue(app_item["is_helper"])
+                self.assertFalse(app_item["in_menu"])
+            if app_item.get("scope") == "standalone":
+                self.assertFalse(app_item["is_helper"])
+                self.assertFalse(app_item["in_menu"])
 
 
 if __name__ == "__main__":

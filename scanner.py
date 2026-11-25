@@ -1447,6 +1447,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         )
 
         app_in_menu = data["in_menu"]
+        is_helper = not data["in_menu"]
         if fname in hidden_menu_files:
             app_in_menu = False
 
@@ -1468,6 +1469,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                 "primary_category": app_primary_cat,
                 "menu_categories": app_menu_categories,
                 "in_menu": app_in_menu,
+                "is_helper": is_helper,
                 "no_display": data["no_display"],
                 "hidden": data["hidden"],
                 "scope": scope,
@@ -1531,6 +1533,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                             "primary_category": "Utilities",
                             "menu_categories": [],
                             "in_menu": False,
+                            "is_helper": False,
                             "no_display": False,
                             "hidden": False,
                             "scope": "standalone",
@@ -1570,6 +1573,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         "total": len(applications),
         "in_menu": sum(1 for a in applications if a["in_menu"]),
         "hidden": sum(1 for a in applications if not a["in_menu"]),
+        "helpers": sum(1 for a in applications if a.get("is_helper")),
         "repo_system": sum(1 for a in applications if a["source_type"].startswith("repo_")),
         "repo_rpm": sum(1 for a in applications if a["source_type"] == "repo_rpm"),
         "repo_pacman": sum(1 for a in applications if a["source_type"] == "repo_pacman"),

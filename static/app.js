@@ -989,10 +989,12 @@ function getFilteredApps() {
   const showHidden = toggleHidden ? toggleHidden.checked : false;
 
   return allApps.filter((app) => {
+    const isHiddenHelper = typeof app.is_helper === "boolean" ? app.is_helper : !app.in_menu;
+
     // Source / Menu Filter
     if (currentSourceFilter === "recently_updated") {
       if (!app.is_recent_update) return false;
-      if (!showHidden && !app.in_menu) return false;
+      if (!showHidden && isHiddenHelper) return false;
     } else if (currentSourceFilter === "hidden") {
       if (app.in_menu) return false;
     } else if (currentSourceFilter === "in_menu") {
@@ -1001,14 +1003,14 @@ function getFilteredApps() {
       if (!app.source_type.startsWith("repo_")) {
         return false;
       }
-      if (!showHidden && !app.in_menu) {
+      if (!showHidden && isHiddenHelper) {
         return false;
       }
     } else {
       if (currentSourceFilter !== "all" && app.source_type !== currentSourceFilter) {
         return false;
       }
-      if (!showHidden && !app.in_menu) {
+      if (!showHidden && isHiddenHelper) {
         return false;
       }
     }
@@ -1200,7 +1202,7 @@ function renderCards(apps) {
 
     const badgeClass = `badge-source-${app.source_type}`;
     const menuBadgeClass = app.in_menu ? "badge-menu" : "badge-hidden";
-    const menuBadgeText = app.in_menu ? "In Menu" : "Hidden";
+    const menuBadgeText = app.in_menu ? "In Menu" : (app.is_helper ? "Helper" : "Off Menu");
 
     const versionSizeStr = [app.package_version, app.installed_size].filter(Boolean).join(" • ");
 
@@ -1484,7 +1486,9 @@ function openModal(app) {
     }
   }
   modalSize.textContent = app.installed_size || "Unknown";
-  modalMenuStatus.textContent = app.in_menu ? "Visible in Application Menu" : "Hidden / Helper Application";
+  modalMenuStatus.textContent = app.in_menu
+    ? "Visible in Application Menu"
+    : (app.is_helper ? "Hidden / Helper Application" : "Installed App (Hidden from Application Menu)");
   const menuCatsStr = app.menu_categories && app.menu_categories.length ? `Active Menu: ${app.menu_categories.join(", ")}` : (app.in_menu ? app.primary_category : "Not in menu");
   const rawCatsStr = app.categories && app.categories.length ? `Desktop Tags: ${app.categories.join(", ")}` : "";
   modalCategory.textContent = [menuCatsStr, rawCatsStr].filter(Boolean).join(" | ");
