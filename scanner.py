@@ -110,9 +110,19 @@ def parse_nevra(nevra_str: str):
     return nevra_str, ""
 
 
+def _parse_dnf_timestamp(date_str: str, time_str: str, is_utc: bool) -> float:
+    """Parse DNF transaction date/time into a Unix epoch timestamp."""
+    iso = f"{date_str}T{time_str}"
+    if is_utc:
+        dt = datetime.datetime.fromisoformat(iso).replace(tzinfo=datetime.timezone.utc)
+    else:
+        dt = datetime.datetime.fromisoformat(iso)
+    return dt.timestamp()
+
+
 def get_recent_dnf_transitions(cutoff_epoch: float) -> Dict[str, Dict[str, str]]:
-    """Query recent DNF/DNF5 transaction history for upgraded and replaced versions."""
-    transitions = {}
+    """Query recent DNF/DNF5 transaction history for upgraded, downgraded, reinstalled, and installed packages."""
+    transitions: Dict[str, Dict[str, str]] = {}
     cmd = None
     if shutil.which("dnf"):
         cmd = "dnf"
@@ -121,50 +131,144 @@ def get_recent_dnf_transitions(cutoff_epoch: float) -> Dict[str, Dict[str, str]]
     if not cmd:
         return transitions
 
+    cmd_path = shutil.which(cmd) or cmd
+    is_dnf5_binary = "dnf5" in os.path.basename(os.path.realpath(cmd_path)).lower()
+
     try:
         proc = subprocess.run([cmd, "history", "list"], capture_output=True, text=True, check=False)
         if proc.returncode != 0:
             return transitions
 
-        target_tids = []
+        target_tids: List[str] = []
         for line in proc.stdout.splitlines()[1:]:
-            m = re.match(r"^\s*(\d+)\s+.*?\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+(\d+)", line)
-            if m:
-                tid, date_str, time_str, altered = m.groups()
-                try:
-                    dt = datetime.datetime.fromisoformat(f"{date_str}T{time_str}")
-                    if dt.timestamp() < cutoff_epoch:
-                        break
-                    if int(altered) > 0:
-                        target_tids.append(tid)
-                except Exception:
+            if not line.strip():
+                continue
+            # DNF4 uses pipe-delimited local timestamps; DNF5 outputs whitespace columns with UTC timestamps
+            if "|" in line:
+                cols = [c.strip() for c in line.split("|")]
+                if len(cols) < 5 or not cols[0].isdigit():
                     continue
+                tid = cols[0]
+                dt_parts = cols[2].split()
+                if len(dt_parts) != 2:
+                    continue
+                date_str, time_str = dt_parts
+                altered_m = re.match(r"(\d+)", cols[4])
+                if not altered_m:
+                    continue
+                altered = int(altered_m.group(1))
+                is_utc = False
+            else:
+                m = re.match(
+                    r"^\s*(\d+)\s+.*?(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)\s+.*?\b(\d+)\s*$",
+                    line,
+                )
+                if not m:
+                    continue
+                tid, date_str, time_str, altered_str = m.groups()
+                altered = int(altered_str)
+                is_utc = is_dnf5_binary or len(time_str) == 8
+
+            try:
+                tx_epoch = _parse_dnf_timestamp(date_str, time_str, is_utc=is_utc)
+                if tx_epoch < cutoff_epoch:
+                    break
+                if altered > 0:
+                    target_tids.append(tid)
+            except Exception:
+                continue
 
         if not target_tids:
             return transitions
 
-        # Fetch transaction details
-        info_proc = subprocess.run([cmd, "history", "info"] + target_tids, capture_output=True, text=True, check=False)
-        if info_proc.returncode != 0:
+        # Fetch transaction details in batches so large histories stay bounded
+        info_lines: List[str] = []
+        for i in range(0, len(target_tids), 25):
+            chunk = target_tids[i : i + 25]
+            info_proc = subprocess.run([cmd, "history", "info"] + chunk, capture_output=True, text=True, check=False)
+            if info_proc.returncode == 0 and info_proc.stdout:
+                info_lines.extend(info_proc.stdout.splitlines())
+
+        if not info_lines:
             return transitions
 
-        in_pkgs = False
-        upgraded = {}
-        replaced = {}
-        installed = {}
+        def _flush_transaction(
+            upgraded: Dict[str, str],
+            downgraded: Dict[str, str],
+            reinstalled: Dict[str, str],
+            installed: Dict[str, str],
+            replaced: Dict[str, str],
+        ) -> None:
+            # Keep the newest transaction result per package (history list is newest-first)
+            for name, new_ver in upgraded.items():
+                if name not in transitions:
+                    old_ver = replaced.get(name, "")
+                    transitions[name] = {
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "version_transition": f"{old_ver} -> {new_ver}" if old_ver else new_ver,
+                        "update_action": "Upgrade",
+                    }
+            for name, new_ver in downgraded.items():
+                if name not in transitions:
+                    old_ver = replaced.get(name, "")
+                    transitions[name] = {
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "version_transition": f"{old_ver} -> {new_ver}" if old_ver else new_ver,
+                        "update_action": "Downgrade",
+                    }
+            for name, new_ver in reinstalled.items():
+                if name not in transitions:
+                    transitions[name] = {
+                        "old_version": replaced.get(name, ""),
+                        "new_version": new_ver,
+                        "version_transition": f"Reinstalled ({new_ver})" if new_ver else "Reinstalled",
+                        "update_action": "Reinstall",
+                    }
+            for name, new_ver in installed.items():
+                if name not in transitions:
+                    transitions[name] = {
+                        "old_version": "",
+                        "new_version": new_ver,
+                        "version_transition": f"New install ({new_ver})" if new_ver else "Installed",
+                        "update_action": "Install",
+                    }
 
-        for line in info_proc.stdout.splitlines():
+        in_pkgs = False
+        upgraded: Dict[str, str] = {}
+        downgraded: Dict[str, str] = {}
+        reinstalled: Dict[str, str] = {}
+        installed: Dict[str, str] = {}
+        replaced: Dict[str, str] = {}
+
+        for line in info_lines:
+            if line.startswith("Transaction ID"):
+                _flush_transaction(upgraded, downgraded, reinstalled, installed, replaced)
+                upgraded.clear()
+                downgraded.clear()
+                reinstalled.clear()
+                installed.clear()
+                replaced.clear()
+                in_pkgs = False
+                continue
             if "Packages altered:" in line:
                 in_pkgs = True
                 continue
             if in_pkgs and line.startswith("  ") and not line.startswith("    "):
                 parts = line.strip().split()
-                if len(parts) >= 2:
+                if len(parts) >= 2 and parts[0] != "Action":
                     action, nevra = parts[0], parts[1]
+                    if action == "Replaced" and len(parts) >= 3 and parts[1].lower() == "by":
+                        nevra = parts[2]
                     name, ver = parse_nevra(nevra)
                     if action in ("Upgrade", "Upgraded"):
                         upgraded[name] = ver
-                    elif action in ("Replaced", "Replaced by"):
+                    elif action in ("Downgrade", "Downgraded"):
+                        downgraded[name] = ver
+                    elif action in ("Reinstall", "Reinstalled"):
+                        reinstalled[name] = ver
+                    elif action == "Replaced":
                         if name not in replaced:
                             replaced[name] = ver
                     elif action in ("Install", "Installed"):
@@ -172,22 +276,7 @@ def get_recent_dnf_transitions(cutoff_epoch: float) -> Dict[str, Dict[str, str]]
             elif in_pkgs and line and not line.startswith(" "):
                 in_pkgs = False
 
-        for name, new_ver in upgraded.items():
-            old_ver = replaced.get(name, "")
-            transitions[name] = {
-                "old_version": old_ver,
-                "new_version": new_ver,
-                "version_transition": f"{old_ver} -> {new_ver}" if old_ver else new_ver,
-                "update_action": "Upgrade",
-            }
-        for name, new_ver in installed.items():
-            if name not in transitions:
-                transitions[name] = {
-                    "old_version": "",
-                    "new_version": new_ver,
-                    "version_transition": f"New install ({new_ver})" if new_ver else "Installed",
-                    "update_action": "Install",
-                }
+        _flush_transaction(upgraded, downgraded, reinstalled, installed, replaced)
     except Exception:
         pass
 
@@ -227,9 +316,66 @@ def get_flatpak_installed() -> Dict[str, Dict[str, Any]]:
     return flatpaks
 
 
+def _parse_rpm_qf_line(line: str) -> Optional[Dict[str, Any]]:
+    """Parse one tab-separated line from rpm -qf --queryformat."""
+    if "\t" not in line:
+        return None
+    parts = line.split("\t")
+    sz_str = ""
+    try:
+        sz_str = format_bytes(int(parts[3].strip()))
+    except Exception:
+        pass
+    inst_time = 0.0
+    try:
+        inst_time = float(parts[4].strip())
+    except Exception:
+        pass
+    return {
+        "name": parts[0].strip(),
+        "version": parts[1].strip(),
+        "arch": parts[2].strip() if len(parts) > 2 else "",
+        "size": sz_str,
+        "summary": parts[5].strip() if len(parts) > 5 else "",
+        "install_time": inst_time,
+        "install_date": format_timestamp(inst_time),
+        "vendor": parts[6].strip() if len(parts) > 6 else "",
+        "packager": parts[7].strip() if len(parts) > 7 else "",
+        "buildhost": "",
+        "release": parts[8].strip() if len(parts) > 8 else "",
+    }
+
+
+def _query_rpm_cli_batch(chunk: List[str], results: Dict[str, Dict[str, Any]]) -> None:
+    """Run batched rpm -qf queries, bisecting only chunks that contain unowned paths."""
+    if not chunk:
+        return
+    qfmt = "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\t%{SIZE}\t%{INSTALLTIME}\t%{SUMMARY}\t%{VENDOR}\t%{PACKAGER}\t%{RELEASE}\n"
+    try:
+        res = subprocess.run(["rpm", "-qf", "--queryformat", qfmt] + chunk, capture_output=True, text=True, check=False)
+        lines = [ln for ln in res.stdout.splitlines() if "\t" in ln]
+        if res.returncode == 0 and len(lines) == len(chunk):
+            for f, line in zip(chunk, lines):
+                parsed = _parse_rpm_qf_line(line)
+                if parsed:
+                    results[f] = parsed
+            return
+        if len(chunk) == 1:
+            if res.returncode == 0 and lines:
+                parsed = _parse_rpm_qf_line(lines[0])
+                if parsed:
+                    results[chunk[0]] = parsed
+            return
+        mid = len(chunk) // 2
+        _query_rpm_cli_batch(chunk[:mid], results)
+        _query_rpm_cli_batch(chunk[mid:], results)
+    except Exception:
+        pass
+
+
 def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, Any]]:
     """Query RPM database for file paths using native python rpm bindings or rpm CLI."""
-    results = {}
+    results: Dict[str, Dict[str, Any]] = {}
     if not file_paths:
         return results
 
@@ -267,42 +413,9 @@ def query_rpm_database(file_paths: List[str]) -> Dict[str, Dict[str, Any]]:
         except Exception:
             pass
 
-    # Fallback to rpm CLI in batches
     batch_size = 80
     for i in range(0, len(file_paths), batch_size):
-        chunk = file_paths[i : i + batch_size]
-        for f in chunk:
-            try:
-                cmd = ["rpm", "-qf", "--queryformat", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\t%{SIZE}\t%{INSTALLTIME}\t%{SUMMARY}\t%{VENDOR}\t%{PACKAGER}\t%{RELEASE}\n", f]
-                res = subprocess.run(cmd, capture_output=True, text=True, check=False)
-                line = res.stdout.strip()
-                if res.returncode == 0 and "\t" in line:
-                    parts = line.split("\t")
-                    sz_str = ""
-                    try:
-                        sz_str = format_bytes(int(parts[3].strip()))
-                    except Exception:
-                        pass
-                    inst_time = 0.0
-                    try:
-                        inst_time = float(parts[4].strip())
-                    except Exception:
-                        pass
-                    results[f] = {
-                        "name": parts[0].strip(),
-                        "version": parts[1].strip(),
-                        "arch": parts[2].strip() if len(parts) > 2 else "",
-                        "size": sz_str,
-                        "summary": parts[5].strip() if len(parts) > 5 else "",
-                        "install_time": inst_time,
-                        "install_date": format_timestamp(inst_time),
-                        "vendor": parts[6].strip() if len(parts) > 6 else "",
-                        "packager": parts[7].strip() if len(parts) > 7 else "",
-                        "buildhost": "",
-                        "release": parts[8].strip() if len(parts) > 8 else "",
-                    }
-            except Exception:
-                pass
+        _query_rpm_cli_batch(file_paths[i : i + batch_size], results)
 
     return results
 
@@ -688,22 +801,24 @@ def parse_desktop_file(filepath: str, active_desktops: Optional[set] = None) -> 
     cat_set = {c.lower() for c in categories}
     if cat_set & {"game", "games", "emulator"}:
         primary_category = "Games"
-    elif cat_set & {"audiovideo", "audio", "video", "multimedia", "player"}:
+    elif cat_set & {"audiovideo", "audio", "video", "multimedia", "player", "tv"}:
         primary_category = "Audio & Video"
     elif cat_set & {"development", "ide", "programming", "debugger"}:
         primary_category = "Development"
-    elif cat_set & {"graphics", "rastergraphics", "photography", "viewer"}:
+    elif cat_set & {"graphics", "rastergraphics", "vectorgraphics", "photography", "viewer", "scanning"}:
         primary_category = "Graphics"
-    elif cat_set & {"network", "webbrowser", "chat", "email", "telephony"}:
+    elif cat_set & {"network", "webbrowser", "chat", "email", "telephony", "filetransfer", "p2p", "instantmessaging"}:
         primary_category = "Internet"
-    elif cat_set & {"office", "wordprocessor", "spreadsheet"}:
+    elif cat_set & {"office", "wordprocessor", "spreadsheet", "presentation"}:
         primary_category = "Office"
-    elif cat_set & {"system", "terminalemulator", "monitor"}:
+    elif cat_set & {"system", "terminalemulator", "monitor", "packagemanager", "filesystem"}:
         primary_category = "System"
-    elif cat_set & {"utility", "utilities", "archiving", "calculator"}:
+    elif cat_set & {"utility", "utilities", "archiving", "calculator", "texteditor", "accessibility", "documentation"}:
         primary_category = "Utilities"
-    elif cat_set & {"settings", "desktopsettings"}:
+    elif cat_set & {"settings", "desktopsettings", "hardwaresettings"}:
         primary_category = "Settings"
+    elif cat_set & {"education", "science", "math", "astronomy", "biology", "chemistry", "physics"}:
+        primary_category = "Education"
 
     return {
         "name": name,
@@ -736,15 +851,177 @@ def extract_executable(exec_cmd: str) -> Optional[str]:
     idx = 0
     while idx < len(tokens):
         token = tokens[idx]
-        if token.startswith("env") or "=" in token:
+        if token == "env" or os.path.basename(token) == "env" or "=" in token:
             idx += 1
             continue
         return token
     return None
 
 
-def get_desktop_menu_layout() -> Tuple[Dict[str, List[str]], Set[str]]:
-    """Parse active desktop environment application menu layout XML.
+def _extract_appimage_target(exec_cmd: str, primary_exe: str) -> str:
+    """Resolve actual AppImage / ~/Applications path even when wrapped in sh -c or env."""
+    candidates: List[str] = []
+    if primary_exe and os.path.basename(primary_exe) not in ("sh", "bash", "zsh", "dash", "env"):
+        candidates.append(primary_exe)
+
+    # Split tokens and unpack shell -c payloads without keeping the raw -c script string
+    try:
+        tokens = shlex.split(exec_cmd)
+    except Exception:
+        tokens = exec_cmd.split()
+
+    expanded_tokens: List[str] = []
+    idx = 0
+    while idx < len(tokens):
+        tok = tokens[idx]
+        if tok in ("-c", "-lc") and idx + 1 < len(tokens):
+            payload = tokens[idx + 1]
+            try:
+                expanded_tokens.extend(shlex.split(payload))
+            except Exception:
+                expanded_tokens.extend(payload.split())
+            idx += 2
+            continue
+        expanded_tokens.append(tok)
+        idx += 1
+
+    for tok in expanded_tokens:
+        if not tok:
+            continue
+        if "/Applications/" in tok or tok.lower().endswith(".appimage"):
+            candidates.append(tok)
+
+    home_dir = os.path.expanduser("~")
+    normalized: List[str] = []
+    for raw in candidates:
+        expanded = raw.strip("\"'")
+        expanded = expanded.replace("\\$HOME", home_dir).replace("$HOME", home_dir).replace("${HOME}", home_dir)
+        expanded = os.path.expanduser(expanded)
+        normalized.append(expanded)
+
+    # Prefer paths that actually exist on disk before falling back to heuristic strings
+    for expanded in normalized:
+        if os.path.isfile(expanded):
+            return expanded
+    for expanded in normalized:
+        if "/Applications/" in expanded or expanded.lower().endswith(".appimage"):
+            return expanded
+
+    return os.path.expanduser(primary_exe.strip("\"'")) if primary_exe else ""
+
+
+def _extract_flatpak_id_from_exec(exec_cmd: str) -> Optional[str]:
+    """Extract Flatpak application ID from a flatpak run command line."""
+    try:
+        tokens = shlex.split(exec_cmd)
+    except Exception:
+        tokens = exec_cmd.split()
+
+    saw_flatpak = False
+    skip_next = False
+    value_flags = {"--branch", "--arch", "--command", "--cwd", "--env", "--filesystem", "--nofilesystem", "--socket", "--nosocket", "--device", "--nodevice", "--share", "--unshare", "--talk-name", "--own-name", "--system-talk-name", "--system-own-name", "--persist", "--runtime", "--runtime-version", "--parent-pid", "--parent-share-pids", "--installation"}
+    for tok in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+        base = os.path.basename(tok)
+        if not saw_flatpak:
+            if base == "flatpak":
+                saw_flatpak = True
+            continue
+        if tok == "run":
+            continue
+        if tok.startswith("-"):
+            if "=" not in tok and tok in value_flags:
+                skip_next = True
+            continue
+        if re.match(r"^[a-zA-Z0-9_.-]+\.[a-zA-Z0-9_.-]+$", tok):
+            return tok
+        return None
+    return None
+
+
+def _eval_menu_rule(elem: ET.Element, fname: str, cat_set: Set[str]) -> bool:
+    """Evaluate a Freedesktop XDG menu XML condition element against a desktop entry."""
+    tag = elem.tag
+    if tag == "Filename":
+        return (elem.text or "").strip() == fname
+    if tag == "Category":
+        return (elem.text or "").strip() in cat_set
+    if tag == "All":
+        return True
+    if tag == "And":
+        children = list(elem)
+        return bool(children) and all(_eval_menu_rule(c, fname, cat_set) for c in children)
+    if tag == "Or":
+        return any(_eval_menu_rule(c, fname, cat_set) for c in elem)
+    if tag == "Not":
+        children = list(elem)
+        return not any(_eval_menu_rule(c, fname, cat_set) for c in children)
+    if tag in ("Include", "Exclude"):
+        return any(_eval_menu_rule(c, fname, cat_set) for c in elem)
+    return False
+
+
+def _standardize_menu_category(cat_name: str) -> str:
+    """Normalize desktop menu directory names to AppIndex category labels."""
+    if cat_name == "Multimedia":
+        return "Audio & Video"
+    return cat_name
+
+
+def _collect_menu_tree(
+    menu_elem: ET.Element,
+    top_cat: Optional[str],
+    menu_map: Dict[str, Dict[str, Any]],
+) -> None:
+    """Recursively collect merged XDG menu definitions keyed by top-level category."""
+    name_el = menu_elem.find("Name")
+    cat_name = name_el.text.strip() if (name_el is not None and name_el.text) else ""
+    current_top = top_cat if top_cat is not None else cat_name
+
+    if current_top:
+        node = menu_map.setdefault(
+            current_top,
+            {
+                "deleted": False,
+                "only_unallocated": False,
+                "include_rules": [],
+                "exclude_rules": [],
+                "layout_files": [],
+                "has_layout": False,
+            },
+        )
+        if menu_elem.find("Deleted") is not None and top_cat is None:
+            node["deleted"] = True
+        elif menu_elem.find("NotDeleted") is not None and top_cat is None:
+            node["deleted"] = False
+
+        if menu_elem.find("OnlyUnallocated") is not None:
+            node["only_unallocated"] = True
+
+        for inc in menu_elem.findall("Include"):
+            node["include_rules"].append(inc)
+        for exc in menu_elem.findall("Exclude"):
+            node["exclude_rules"].append(exc)
+
+        layout_el = menu_elem.find("Layout")
+        if layout_el is not None:
+            node["has_layout"] = True
+            for fn in layout_el.findall("Filename"):
+                if fn.text and fn.text.strip():
+                    fname = fn.text.strip()
+                    if fname not in node["layout_files"]:
+                        node["layout_files"].append(fname)
+
+    for sub in menu_elem.findall("Menu"):
+        _collect_menu_tree(sub, current_top, menu_map)
+
+
+def get_desktop_menu_layout(
+    desktop_entries: Optional[Dict[str, Set[str]]] = None,
+) -> Tuple[Dict[str, List[str]], Set[str]]:
+    """Parse active desktop environment application menu layout XML (base + user overrides).
     Returns:
         tuple: (active_menu_categories: Dict[desktop_filename, List[category_names]],
                 hidden_desktop_filenames: Set[desktop_filename])
@@ -752,74 +1029,93 @@ def get_desktop_menu_layout() -> Tuple[Dict[str, List[str]], Set[str]]:
     active_menu_categories: Dict[str, List[str]] = defaultdict(list)
     hidden_desktop_filenames: Set[str] = set()
 
-    # Search candidates in priority order (KDE Plasma kmenuedit override first, then standard XDG menus)
-    menu_candidates = [
-        os.path.expanduser("~/.config/menus/applications-kmenuedit.menu"),
+    # Select base XDG menu plus optional user overrides (e.g. kmenuedit delta)
+    base_candidates = [
         os.path.expanduser("~/.config/menus/plasma-applications.menu"),
         os.path.expanduser("~/.config/menus/applications.menu"),
         "/etc/xdg/menus/plasma-applications.menu",
         "/etc/xdg/menus/kf5-applications.menu",
         "/etc/xdg/menus/applications.menu",
     ]
+    override_candidates = [
+        os.path.expanduser("~/.config/menus/applications-kmenuedit.menu"),
+    ]
 
-    selected_menu = None
-    for candidate in menu_candidates:
-        if os.path.isfile(candidate):
-            selected_menu = candidate
-            break
+    base_menu = next((c for c in base_candidates if os.path.isfile(c)), None)
+    override_menus = [c for c in override_candidates if os.path.isfile(c)]
 
-    if not selected_menu:
+    if not base_menu and not override_menus:
         return active_menu_categories, hidden_desktop_filenames
 
-    try:
-        tree = ET.parse(selected_menu)
-        root = tree.getroot()
+    menu_map: Dict[str, Dict[str, Any]] = {}
+    for menu_file in [m for m in [base_menu] + override_menus if m]:
+        try:
+            tree = ET.parse(menu_file)
+            root = tree.getroot()
+            for menu in root.findall("Menu"):
+                _collect_menu_tree(menu, None, menu_map)
+        except Exception:
+            continue
 
-        # Parse hidden applications
-        for menu in root.findall("Menu"):
-            name_el = menu.find("Name")
-            if name_el is not None and name_el.text and name_el.text.strip() == ".hidden":
-                for inc in menu.findall("Include"):
-                    for fn in inc.findall("Filename"):
-                        if fn.text:
-                            hidden_desktop_filenames.add(fn.text.strip())
+    # Evaluate .hidden first
+    hidden_node = menu_map.get(".hidden")
+    if hidden_node and not hidden_node["deleted"]:
+        for inc in hidden_node["include_rules"]:
+            for fn in inc.findall("Filename"):
+                if fn.text and fn.text.strip():
+                    hidden_desktop_filenames.add(fn.text.strip())
+        for exc in hidden_node["exclude_rules"]:
+            for fn in exc.findall("Filename"):
+                if fn.text and fn.text.strip():
+                    hidden_desktop_filenames.discard(fn.text.strip())
 
-        ignored_menu_categories = {".hidden", "Help", "chrome-apps", "webapps-webapps", "Applications"}
+    ignored_menu_categories = {".hidden", "chrome-apps", "webapps-webapps", "Applications"}
+    entries_map = desktop_entries or {}
 
-        for menu in root.findall("Menu"):
-            name_el = menu.find("Name")
-            if name_el is None or not name_el.text:
+    def _is_excluded(node: Dict[str, Any], fname: str, cats: Set[str]) -> bool:
+        return any(_eval_menu_rule(exc, fname, cats) for exc in node["exclude_rules"])
+
+    # Evaluate normal menus first, then OnlyUnallocated buckets (like Applications)
+    for cat_name, node in menu_map.items():
+        if cat_name in ignored_menu_categories or node["deleted"] or node["only_unallocated"]:
+            continue
+
+        display_cat = _standardize_menu_category(cat_name)
+
+        # 1. Explicit Filenames in Layout (respecting Exclude and .hidden)
+        for fname in node["layout_files"]:
+            if fname in hidden_desktop_filenames:
                 continue
-            cat_name = name_el.text.strip()
-            if cat_name in ignored_menu_categories:
+            cats = entries_map.get(fname, set())
+            if _is_excluded(node, fname, cats):
                 continue
+            if display_cat not in active_menu_categories[fname]:
+                active_menu_categories[fname].append(display_cat)
 
-            # Standardize or map category names if needed
-            display_cat = cat_name
-            if cat_name == "Multimedia":
-                display_cat = "Audio & Video"
+        # 2. Explicit <Filename> entries in <Include> (not Excluded or .hidden)
+        for inc in node["include_rules"]:
+            for fn in inc.findall("Filename"):
+                if not fn.text or not fn.text.strip():
+                    continue
+                fname = fn.text.strip()
+                if fname in hidden_desktop_filenames:
+                    continue
+                cats = entries_map.get(fname, set())
+                if _is_excluded(node, fname, cats):
+                    continue
+                if display_cat not in active_menu_categories[fname]:
+                    active_menu_categories[fname].append(display_cat)
 
-            for fn in menu.findall("Layout/Filename"):
-                if fn.text:
-                    fname = fn.text.strip()
-                    if fname not in hidden_desktop_filenames:
-                        if display_cat not in active_menu_categories[fname]:
-                            active_menu_categories[fname].append(display_cat)
-
-            # Also check direct Includes that are not Excluded if Layout is empty
-            layout_files = menu.findall("Layout/Filename")
-            if not layout_files:
-                excluded = {ex.text.strip() for exc in menu.findall("Exclude") for ex in exc.findall("Filename") if ex.text}
-                for inc in menu.findall("Include"):
-                    for fn in inc.findall("Filename"):
-                        if fn.text:
-                            fname = fn.text.strip()
-                            if fname not in excluded and fname not in hidden_desktop_filenames:
-                                if display_cat not in active_menu_categories[fname]:
-                                    active_menu_categories[fname].append(display_cat)
-
-    except Exception:
-        pass
+        # 3. Rule-based <Include> evaluation against desktop entry categories (when desktop_entries supplied)
+        if entries_map and node["include_rules"]:
+            for fname, cats in entries_map.items():
+                if fname in hidden_desktop_filenames:
+                    continue
+                if _is_excluded(node, fname, cats):
+                    continue
+                if any(_eval_menu_rule(inc, fname, cats) for inc in node["include_rules"]):
+                    if display_cat not in active_menu_categories[fname]:
+                        active_menu_categories[fname].append(display_cat)
 
     return active_menu_categories, hidden_desktop_filenames
 
@@ -829,7 +1125,6 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
     distro_info = get_distribution_info()
     active_desktops = get_active_desktop_environments()
     flatpak_apps = get_flatpak_installed()
-    active_menu_cats, hidden_menu_files = get_desktop_menu_layout()
 
     desktop_records = []
     seen_desktop_filenames = {}
@@ -876,20 +1171,29 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         except Exception:
             pass
 
+    desktop_category_map = {
+        rec["filename"]: set(rec["data"].get("categories", []))
+        for rec in desktop_records
+    }
+    active_menu_cats, hidden_menu_files = get_desktop_menu_layout(desktop_entries=desktop_category_map)
+
     # Collect files to query against native system package manager
     query_files = list(seen_system_files) + shadowed_system_files
     local_binaries_map = {}
     for rec in desktop_records:
         if rec["scope"] == "local_user":
             exe = extract_executable(rec["data"]["exec_cmd"])
+            resolved = None
             if exe and not os.path.isabs(exe):
                 resolved = shutil.which(exe)
-                if resolved and resolved.startswith("/usr/"):
-                    query_files.append(resolved)
-                    local_binaries_map[rec["path"]] = resolved
-            elif exe and os.path.isabs(exe) and exe.startswith("/usr/"):
-                query_files.append(exe)
-                local_binaries_map[rec["path"]] = exe
+            elif exe and os.path.isabs(exe):
+                resolved = exe
+            if resolved:
+                real_res = os.path.realpath(resolved)
+                target_path = real_res if real_res.startswith("/usr/") else (resolved if resolved.startswith("/usr/") else None)
+                if target_path:
+                    query_files.append(target_path)
+                    local_binaries_map[rec["path"]] = target_path
 
     file_to_pkg = query_system_package_database(list(dict.fromkeys(query_files)), distro_info)
 
@@ -916,6 +1220,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
     for rec in desktop_records:
         path = rec["path"]
         fname = rec["filename"]
+        base_desktop_id = fname.removesuffix(".desktop")
         scope = rec["scope"]
         data = rec["data"]
         shadowed = rec.get("shadowed_paths", [])
@@ -925,7 +1230,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
 
         source_type = "unmanaged"
         source_label = "Unmanaged"
-        package_name = fname.replace(".desktop", "")
+        package_name = base_desktop_id
         package_version = ""
         package_arch = ""
         package_vendor = ""
@@ -941,19 +1246,15 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         update_action = ""
         steam_id = ""
 
-        # Check if Flatpak (either direct in flatpak exports or shadowing a flatpak export)
+        # Check if Flatpak (prioritize X-Flatpak header so secondary desktop files map to the owning Flatpak ID)
         flatpak_id = None
         has_flatpak_shadow = any("/flatpak/exports/" in sp for sp in shadowed)
-        if scope in ("flatpak_system", "flatpak_user"):
-            flatpak_id = fname.replace(".desktop", "")
-        elif has_flatpak_shadow:
-            flatpak_id = fname.replace(".desktop", "")
-        elif data.get("x_flatpak"):
+        if data.get("x_flatpak"):
             flatpak_id = data["x_flatpak"]
-        elif "flatpak run" in exec_cmd:
-            match = re.search(r"flatpak(?:\s+run)?(?:\s+--\S+)*\s+([a-zA-Z0-9_.-]+)", exec_cmd)
-            if match and not match.group(1).startswith("-"):
-                flatpak_id = match.group(1)
+        elif scope in ("flatpak_system", "flatpak_user") or has_flatpak_shadow:
+            flatpak_id = base_desktop_id
+        elif "flatpak" in exec_cmd:
+            flatpak_id = _extract_flatpak_id_from_exec(exec_cmd)
 
         if flatpak_id:
             source_type = "flatpak"
@@ -1000,20 +1301,24 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         elif (
             "/Applications/" in exec_cmd
             or ".appimage" in exec_cmd.lower()
-            or (primary_exe and os.path.exists(primary_exe) and "/Applications/" in primary_exe)
+            or (primary_exe and os.path.exists(os.path.expanduser(primary_exe)) and "/Applications/" in primary_exe)
         ):
             source_type = "appimage"
             source_label = "AppImage"
             repo_origin = "Standalone AppImage"
-            clean_exe = primary_exe.strip("\"'")
-            if os.path.exists(clean_exe):
+            clean_exe = _extract_appimage_target(exec_cmd, primary_exe)
+            if clean_exe and os.path.isfile(clean_exe):
                 processed_appimage_paths.add(os.path.realpath(clean_exe))
                 install_time = os.path.getmtime(clean_exe)
+                try:
+                    installed_size = format_bytes(os.path.getsize(clean_exe))
+                except OSError:
+                    pass
             elif os.path.exists(path):
                 install_time = os.path.getmtime(path)
             install_date = format_timestamp(install_time)
             package_name = os.path.basename(clean_exe) if clean_exe else fname
-            uninstall_command = f'rm -f "{clean_exe}" "{path}"'
+            uninstall_command = f'rm -f "{clean_exe}" "{path}"' if clean_exe else f'rm -f "{path}"'
             uninstall_note = "Deletes the portable executable and its menu shortcut"
 
         # Check if Web App / PWA
@@ -1026,7 +1331,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
             source_type = "web_app"
             source_label = "Web App (PWA)"
             repo_origin = "Web Application (PWA)"
-            package_name = fname.replace(".desktop", "")
+            package_name = base_desktop_id
             uninstall_command = f'rm -f "{path}"'
             uninstall_note = "Removes the web application desktop shortcut"
             if os.path.exists(path):
@@ -1073,7 +1378,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
                 source_type = "local_tool"
                 source_label = "Local App"
                 repo_origin = "Local Application (~/.local/share/applications)"
-                package_name = fname.replace(".desktop", "")
+                package_name = base_desktop_id
                 uninstall_command = f'rm -f "{path}"'
                 uninstall_note = "Removes the local desktop shortcut"
                 data["primary_category"] = "Local Apps"
@@ -1116,7 +1421,7 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
             source_type = "unmanaged"
             source_label = "Unmanaged"
             repo_origin = "Unmanaged System Launcher"
-            package_name = fname.replace(".desktop", "")
+            package_name = base_desktop_id
             uninstall_command = f'sudo rm -f "{path}"'
             uninstall_note = "Manually created system desktop entry"
             if os.path.exists(path):
@@ -1145,14 +1450,11 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
         if fname in hidden_menu_files:
             app_in_menu = False
 
-        app_menu_categories = list(active_menu_cats.get(fname, []))
+        # Never force NoDisplay=true or Hidden=true desktop entries back into visible menu
+        app_menu_categories = list(active_menu_cats.get(fname, [])) if app_in_menu else []
         app_primary_cat = data["primary_category"]
         if app_menu_categories:
             app_primary_cat = app_menu_categories[0]
-            app_in_menu = True
-        elif not app_in_menu:
-            # If not in menu and no active menu categories, keep primary_category as fallback
-            pass
 
         app_id = f"{scope}:{fname}"
         applications.append(
@@ -1197,12 +1499,13 @@ def scan_all_applications(recent_hours: int = 48) -> Dict[str, Any]:
 
     # Add standalone AppImages in ~/Applications not having desktop files
     if os.path.exists(APPLICATIONS_DIR):
+        non_app_exts = (".bak", ".txt", ".py", ".sh", ".json", ".log", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".md", ".yaml", ".yml", ".desktop", ".zip", ".tar", ".gz", ".xz")
         try:
             for item in sorted(os.listdir(APPLICATIONS_DIR)):
                 app_path = os.path.join(APPLICATIONS_DIR, item)
                 if not os.path.isfile(app_path):
                     continue
-                if item.endswith((".bak", ".txt", ".py", ".sh", ".json", ".log", ".png", ".jpg")):
+                if item.lower().endswith(non_app_exts):
                     continue
                 real_app = os.path.realpath(app_path)
                 if real_app in processed_appimage_paths:

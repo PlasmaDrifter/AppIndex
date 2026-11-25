@@ -26,7 +26,9 @@ DATA_DIR = Path.home() / ".local" / "share" / "appindex"
 DB_PATH = DATA_DIR / "usage.db"
 
 _LOCK = threading.Lock()
+_SYNC_LOCK = threading.Lock()
 _IN_MEMORY_USAGE: Dict[str, Dict[str, Any]] = {}
+_CACHE_LOADED: bool = False
 _LAST_SYNC_TIME: float = 0.0
 
 
@@ -71,9 +73,9 @@ def init_db():
 
 def load_cached_usage() -> Dict[str, Dict[str, Any]]:
     """Load all cached usage statistics from SQLite into memory."""
-    global _IN_MEMORY_USAGE
+    global _IN_MEMORY_USAGE, _CACHE_LOADED
     with _LOCK:
-        if _IN_MEMORY_USAGE:
+        if _CACHE_LOADED:
             return _IN_MEMORY_USAGE
         data = {}
         try:
@@ -91,6 +93,7 @@ def load_cached_usage() -> Dict[str, Dict[str, Any]]:
         except Exception as e:
             logger.warning(f"Error loading usage cache: {e}")
         _IN_MEMORY_USAGE = data
+        _CACHE_LOADED = True
         return _IN_MEMORY_USAGE
 
 
@@ -99,12 +102,11 @@ def normalize_unit_name(unit_raw: str) -> str:
     # Examples:
     # app-flatpak-org.remmina.Remmina-1570793699.scope -> org.remmina.Remmina
     # app-md.obsidian.Obsidian@2e99c2c416e048218e02c5f4fb066e31.service -> md.obsidian.Obsidian
-    # app-smplayer@eeaec95afea7404ea3a35a3be1ce4908.service -> smplayer
+    # app-nobara\x2dcve\x2dscanner@autostart.service -> nobara-cve-scanner
     # app-org.kde.dolphin@3c4e1627e73749ee83d792c9d7f41d6d.service -> org.kde.dolphin
-    # app-ca._0ldsk00l.Nestopia-2996944286.scope -> ca._0ldsk00l.Nestopia
     clean = unit_raw.replace("\\x2d", "-")
     clean = re.sub(r"^app-(?:flatpak-)?", "", clean)
-    clean = re.sub(r"@[a-f0-9]+\.service$", "", clean)
+    clean = re.sub(r"@[^.]+\.service$", "", clean)
     clean = re.sub(r"-\d+\.scope$", "", clean)
     clean = re.sub(r"\.service$", "", clean)
     return clean.strip()
@@ -115,39 +117,62 @@ def sync_journal_history(force_full: bool = False):
     Parse systemd user journal entries for app launches.
     Supports incremental syncing via saved journal cursors.
     """
-    global _IN_MEMORY_USAGE, _LAST_SYNC_TIME
+    global _IN_MEMORY_USAGE, _CACHE_LOADED, _LAST_SYNC_TIME
     if not shutil.which("journalctl"):
         return
 
-    init_db()
-
-    last_cursor = None
-    if not force_full:
-        try:
-            with get_db_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT value FROM sync_meta WHERE key = 'journal_cursor';")
-                row = cur.fetchone()
-                if row:
-                    last_cursor = row[0]
-        except Exception:
-            pass
-
-    cmd = ["journalctl", "--user", "--grep=Started app-", "-o", "json"]
-    if last_cursor and not force_full:
-        cmd.extend(["--after-cursor", last_cursor])
-    else:
-        # Initial cold ingestion: look back up to 90 days for snappy first-run indexing
-        cmd.extend(["--since=90 days ago"])
+    if not _SYNC_LOCK.acquire(blocking=force_full):
+        return
 
     try:
+        init_db()
+
+        last_cursor = None
+        last_sync_meta = None
+        if not force_full:
+            try:
+                with get_db_connection() as conn:
+                    cur = conn.cursor()
+                    cur.execute("SELECT key, value FROM sync_meta WHERE key IN ('journal_cursor', 'last_sync');")
+                    for key, val in cur.fetchall():
+                        if key == "journal_cursor":
+                            last_cursor = val
+                        elif key == "last_sync":
+                            last_sync_meta = val
+            except Exception:
+                pass
+
+        base_cmd = [
+            "journalctl",
+            "--user",
+            "-t",
+            "systemd",
+            "--grep=Started app-",
+            "-o",
+            "json",
+            "--output-fields=USER_UNIT,_SYSTEMD_USER_UNIT,__REALTIME_TIMESTAMP",
+        ]
+        if last_cursor and not force_full:
+            cmd = base_cmd + ["--after-cursor", last_cursor]
+        else:
+            # Initial cold ingestion: look back up to 90 days for snappy first-run indexing
+            cmd = base_cmd + ["--since=90 days ago"]
+
         proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        if proc.returncode != 0 and not proc.stdout:
-            return
-        lines = proc.stdout.splitlines()
-        if not lines:
-            _LAST_SYNC_TIME = time.time()
-            return
+        if proc.returncode != 0 and not proc.stdout and last_cursor and not force_full:
+            # Saved cursor expired/invalid: resume incrementally from last_sync epoch instead of dropping history
+            if last_sync_meta:
+                try:
+                    since_epoch = int(float(last_sync_meta))
+                    cmd = base_cmd + [f"--since=@{since_epoch}"]
+                    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                except Exception:
+                    pass
+            elif not _IN_MEMORY_USAGE:
+                cmd = base_cmd + ["--since=90 days ago"]
+                proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+        lines = proc.stdout.splitlines() if (proc.returncode == 0 or proc.stdout) else []
 
         new_launches: Dict[str, Dict[str, Any]] = {}
         newest_cursor = None
@@ -185,23 +210,45 @@ def sync_journal_history(force_full: bool = False):
             except Exception:
                 continue
 
-        # Sync Steam games LastPlayed
+        # Sync Steam games LastPlayed timestamps without inflating launch counts on unchanged timestamps
         steam_launches = scan_steam_last_played()
-        for k, v in steam_launches.items():
-            if k not in new_launches or v["last_used"] > new_launches[k]["last_used"]:
-                new_launches[k] = v
+
+        if not new_launches and not steam_launches and not newest_cursor:
+            _LAST_SYNC_TIME = time.time()
+            return
 
         # Commit updates into database and memory
         with _LOCK:
             with get_db_connection() as conn:
                 cur = conn.cursor()
-                for key, data in new_launches.items():
+                for data in new_launches.values():
                     cur.execute(
                         """
                         INSERT INTO app_usage (app_key, launch_count, last_used_timestamp, last_used_date)
                         VALUES (?, ?, ?, datetime(?, 'unixepoch', 'localtime'))
                         ON CONFLICT(app_key) DO UPDATE SET
                             launch_count = app_usage.launch_count + excluded.launch_count,
+                            last_used_timestamp = MAX(app_usage.last_used_timestamp, excluded.last_used_timestamp),
+                            last_used_date = CASE
+                                WHEN excluded.last_used_timestamp > app_usage.last_used_timestamp
+                                THEN excluded.last_used_date
+                                ELSE app_usage.last_used_date
+                            END;
+                        """,
+                        (data["name"], data["count"], data["last_used"], int(data["last_used"])),
+                    )
+
+                for data in steam_launches.values():
+                    cur.execute(
+                        """
+                        INSERT INTO app_usage (app_key, launch_count, last_used_timestamp, last_used_date)
+                        VALUES (?, ?, ?, datetime(?, 'unixepoch', 'localtime'))
+                        ON CONFLICT(app_key) DO UPDATE SET
+                            launch_count = CASE
+                                WHEN excluded.last_used_timestamp > app_usage.last_used_timestamp
+                                THEN app_usage.launch_count + 1
+                                ELSE MAX(app_usage.launch_count, 1)
+                            END,
                             last_used_timestamp = MAX(app_usage.last_used_timestamp, excluded.last_used_timestamp),
                             last_used_date = CASE
                                 WHEN excluded.last_used_timestamp > app_usage.last_used_timestamp
@@ -225,28 +272,55 @@ def sync_journal_history(force_full: bool = False):
 
             # Refresh in-memory cache
             _IN_MEMORY_USAGE.clear()
+            _CACHE_LOADED = False
             _LAST_SYNC_TIME = time.time()
 
         load_cached_usage()
 
     except Exception as e:
         logger.warning(f"Error during journal launch sync: {e}")
+    finally:
+        _SYNC_LOCK.release()
 
 
 def scan_steam_last_played() -> Dict[str, Dict[str, Any]]:
-    """Scan Steam library manifests for LastPlayed timestamps."""
+    """Scan Steam library manifests directly (avoiding recursive traversal over compatdata)."""
     results = {}
     steam_roots = [
         Path.home() / ".local" / "share" / "Steam",
         Path.home() / ".steam" / "steam",
+        Path.home() / ".steam" / "root",
         Path.home() / ".var" / "app" / "com.valvesoftware.Steam" / ".local" / "share" / "Steam",
     ]
+
+    library_steamapps: list[Path] = []
+    seen_real_dirs: set[str] = set()
+
+    def _add_steamapps_dir(steamapps_path: Path) -> None:
+        if not steamapps_path.is_dir():
+            return
+        real = os.path.realpath(steamapps_path)
+        if real not in seen_real_dirs:
+            seen_real_dirs.add(real)
+            library_steamapps.append(steamapps_path)
 
     for root in steam_roots:
         if not root.is_dir():
             continue
+        main_steamapps = root / "steamapps"
+        _add_steamapps_dir(main_steamapps)
+        vdf = main_steamapps / "libraryfolders.vdf"
+        if vdf.is_file():
+            try:
+                vdf_text = vdf.read_text(encoding="utf-8", errors="ignore")
+                for m in re.finditer(r'"path"\s+"([^"]+)"', vdf_text):
+                    _add_steamapps_dir(Path(m.group(1)) / "steamapps")
+            except Exception:
+                pass
+
+    for steamapps_dir in library_steamapps:
         try:
-            for acf in root.glob("**/appmanifest_*.acf"):
+            for acf in steamapps_dir.glob("appmanifest_*.acf"):
                 try:
                     content = acf.read_text(encoding="utf-8", errors="ignore")
                     appid_m = re.search(r'"appid"\s+"(\d+)"', content)
@@ -305,7 +379,7 @@ def get_app_usage_metrics(
     if pkg_clean:
         candidates.append(pkg_clean)
 
-    fname_clean = (desktop_filename or "").replace(".desktop", "").lower().strip()
+    fname_clean = (desktop_filename or "").removesuffix(".desktop").lower().strip()
     if fname_clean:
         candidates.append(fname_clean)
         if "." in fname_clean:

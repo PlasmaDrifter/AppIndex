@@ -7,19 +7,24 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT="${APPINDEX_PORT:-8765}"
 URL="http://localhost:${PORT}"
+SERVICE_NAME="appindex.service"
 ACTION="${1:-launch}"
 
 is_running() {
     curl -s --connect-timeout 1 "${URL}/api/status" >/dev/null 2>&1
 }
 
+has_systemd_service() {
+    [ "${PORT}" = "8765" ] && command -v systemctl >/dev/null 2>&1 && systemctl --user list-unit-files "${SERVICE_NAME}" 2>/dev/null | grep -q "${SERVICE_NAME}"
+}
+
 wait_for_server() {
     local timeout=15
     local count=0
     while ! is_running; do
-        sleep 0.5
+        sleep 0.25
         count=$((count + 1))
-        if [ "$count" -ge $((timeout * 2)) ]; then
+        if [ "$count" -ge $((timeout * 4)) ]; then
             echo "Error: Timed out waiting for AppIndex server to start." >&2
             return 1
         fi
@@ -29,8 +34,23 @@ wait_for_server() {
 ensure_server() {
     if ! is_running; then
         echo "Starting AppIndex server in background on port ${PORT}..."
-        nohup python3 "${SCRIPT_DIR}/server.py" --port "${PORT}" >/dev/null 2>&1 &
+        if has_systemd_service; then
+            systemctl --user start "${SERVICE_NAME}"
+        else
+            nohup python3 "${SCRIPT_DIR}/server.py" --port "${PORT}" >/dev/null 2>&1 &
+        fi
         wait_for_server
+    fi
+}
+
+stop_server() {
+    if has_systemd_service && systemctl --user is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
+        echo "Stopping ${SERVICE_NAME}..."
+        systemctl --user stop "${SERVICE_NAME}"
+    fi
+    if is_running; then
+        echo "Stopping AppIndex server..."
+        pkill -f "${SCRIPT_DIR}/server\.py.*--port[[:space:]]+${PORT}" 2>/dev/null || true
     fi
 }
 
@@ -61,6 +81,9 @@ case "${ACTION}" in
             echo "AppIndex is running at ${URL}"
             curl -s "${URL}/api/status"
             echo ""
+            if has_systemd_service; then
+                systemctl --user status "${SERVICE_NAME}" --no-pager || true
+            fi
         else
             echo "AppIndex server is not running."
         fi
@@ -72,9 +95,8 @@ case "${ACTION}" in
         echo ""
         ;;
     stop)
-        if is_running; then
-            echo "Stopping AppIndex server..."
-            pkill -f "server.py.*${PORT}" || true
+        if is_running || (has_systemd_service && systemctl --user is-active --quiet "${SERVICE_NAME}" 2>/dev/null); then
+            stop_server
             echo "AppIndex server stopped."
         else
             echo "AppIndex server is not running."
@@ -82,9 +104,14 @@ case "${ACTION}" in
         ;;
     restart)
         echo "Restarting AppIndex server..."
-        pkill -f "server.py.*${PORT}" || true
-        sleep 1
-        ensure_server
+        if has_systemd_service && systemctl --user is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
+            systemctl --user restart "${SERVICE_NAME}"
+            wait_for_server
+        else
+            stop_server
+            sleep 1
+            ensure_server
+        fi
         echo "AppIndex server restarted at ${URL}"
         ;;
     update)
@@ -99,9 +126,14 @@ case "${ACTION}" in
         fi
         if is_running; then
             echo "Restarting server with updated code..."
-            pkill -f "server.py.*${PORT}" || true
-            sleep 1
-            ensure_server
+            if has_systemd_service && systemctl --user is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
+                systemctl --user restart "${SERVICE_NAME}"
+                wait_for_server
+            else
+                stop_server
+                sleep 1
+                ensure_server
+            fi
         fi
         echo "AppIndex successfully updated."
         ;;

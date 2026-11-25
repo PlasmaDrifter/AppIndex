@@ -38,7 +38,7 @@ if command -v systemctl >/dev/null 2>&1; then
 fi
 
 # 4. Optional purge of cached usage data
-USAGE_DB="${XDG_DATA_HOME:-$HOME/.local/share}/appindex/app_usage.db"
+USAGE_DB="${XDG_DATA_HOME:-$HOME/.local/share}/appindex/usage.db"
 if [ "${1:-}" = "--purge" ]; then
     echo "Purging local cached application database at ${USAGE_DB}..."
     rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/appindex"

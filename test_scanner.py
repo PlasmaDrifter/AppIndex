@@ -295,10 +295,10 @@ class TestMenuLayout(unittest.TestCase):
         res = scan_all_applications()
         apps = res.get("applications", [])
         self.assertTrue(len(apps) > 0)
-        for app in apps:
-            self.assertIn("menu_categories", app)
-            self.assertIsInstance(app["menu_categories"], list)
-            self.assertIn("primary_category", app)
+        for app_item in apps:
+            self.assertIn("menu_categories", app_item)
+            self.assertIsInstance(app_item["menu_categories"], list)
+            self.assertIn("primary_category", app_item)
 
 
 class TestAutoExporter(unittest.TestCase):
@@ -411,7 +411,6 @@ class TestAutoExporter(unittest.TestCase):
 
     def test_prune_old_exports(self):
         from pathlib import Path
-        import time
         from auto_exporter import prune_old_exports, get_retained_export_files
 
         target_dir = Path(self.temp_dir.name) / "prune_test"
@@ -455,6 +454,170 @@ class TestAutoExporter(unittest.TestCase):
         pruned_zero, remaining_zero = prune_old_exports(target_dir, max_retained=0)
         self.assertEqual(pruned_zero, 0)
         self.assertEqual(remaining_zero, 3)
+
+
+class TestRegressionFixes(unittest.TestCase):
+    def test_dnf5_history_transitions_utc_and_newest_tx(self):
+        import datetime
+        from unittest.mock import patch, MagicMock
+        import scanner
+
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        ts_recent_new = (now_utc - datetime.timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        ts_recent_old = (now_utc - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+        ts_expired = (now_utc - datetime.timedelta(hours=100)).strftime("%Y-%m-%d %H:%M:%S")
+
+        list_stdout = (
+            "  ID Command line                         Date and time       Action(s) Altered\n"
+            f"1342 dnf5 replay job                      {ts_recent_new} D, R           4\n"
+            f"1341 dnf install sniffnet                 {ts_recent_old} U              2\n"
+            f"1300 dnf upgrade                          {ts_expired} U              10\n"
+        )
+        info_stdout = (
+            "Transaction ID : 1342\n"
+            "Packages altered:\n"
+            "  Action    Package                                Reason Repository\n"
+            "  Downgrade sniffnet-0:1.5.1-2.fc44.x86_64         User   terra\n"
+            "  Replaced  sniffnet-0:1.6.0-1.x86_64              User   @System\n"
+            "  Reinstall steam-0:1.0.0.87-5.fc44.x86_64         User   terra\n"
+            "  Replaced  steam-0:1.0.0.87-5.fc44.x86_64         User   @System\n"
+            "Transaction ID : 1341\n"
+            "Packages altered:\n"
+            "  Action    Package                                Reason Repository\n"
+            "  Upgrade   sniffnet-0:1.6.0-1.x86_64              User   @commandline\n"
+            "  Replaced  sniffnet-0:1.5.1-2.fc44.x86_64         User   @System\n"
+        )
+
+        def fake_run(cmd, **_kwargs):
+            m = MagicMock()
+            m.returncode = 0
+            if cmd[:3] == ["dnf", "history", "list"]:
+                m.stdout = list_stdout
+            else:
+                m.stdout = info_stdout
+            return m
+
+        cutoff = datetime.datetime.now().timestamp() - (48 * 3600)
+        with patch("shutil.which", side_effect=lambda x: "/usr/bin/dnf5" if x == "dnf" else None), \
+             patch("os.path.realpath", return_value="/usr/bin/dnf5"), \
+             patch("subprocess.run", side_effect=fake_run):
+            transitions = scanner.get_recent_dnf_transitions(cutoff)
+
+        self.assertIn("sniffnet", transitions)
+        self.assertEqual(transitions["sniffnet"]["update_action"], "Downgrade")
+        self.assertEqual(transitions["sniffnet"]["version_transition"], "1.6.0-1 -> 1.5.1-2.fc44")
+        self.assertIn("steam", transitions)
+        self.assertEqual(transitions["steam"]["update_action"], "Reinstall")
+
+    def test_flatpak_and_appimage_helpers(self):
+        import tempfile
+        from scanner import _extract_flatpak_id_from_exec, _extract_appimage_target
+
+        self.assertEqual(
+            _extract_flatpak_id_from_exec("/usr/bin/flatpak run --branch=stable --command foo org.example.App @@u %U @@"),
+            "org.example.App",
+        )
+        self.assertEqual("org.telegram.desktop.desktop".removesuffix(".desktop"), "org.telegram.desktop")
+
+        with tempfile.NamedTemporaryFile(suffix=".AppImage", delete=False) as tf:
+            appimg_path = tf.name
+        try:
+            resolved = _extract_appimage_target(f'sh -c "exec {appimg_path} \\"$@\\"" -- %u', "sh")
+            self.assertEqual(resolved, appimg_path)
+        finally:
+            if os.path.exists(appimg_path):
+                os.remove(appimg_path)
+
+    def test_auto_export_source_aliases(self):
+        import tempfile
+        from pathlib import Path
+        import auto_exporter
+
+        with tempfile.TemporaryDirectory() as tmp:
+            orig_cfg = auto_exporter.CONFIG_FILE
+            auto_exporter.CONFIG_FILE = Path(tmp) / "auto_export.json"
+            try:
+                sample_apps = [
+                    {"name": "RpmApp", "source_type": "repo_rpm", "source_label": "Nobara Repo (RPM)", "package_name": "rpmapp", "in_menu": True, "categories": ["System", "Monitor"]},
+                    {"name": "LocalApp", "source_type": "local_tool", "source_label": "Local App", "package_name": "localapp", "in_menu": True, "categories": ["Utility"]},
+                    {"name": "WebApp", "source_type": "web_app", "source_label": "Web App (PWA)", "package_name": "webapp", "in_menu": True, "categories": ["Network"]},
+                    {"name": "FlatApp", "source_type": "flatpak", "source_label": "Flatpak (User)", "package_name": "org.flat.App", "in_menu": True, "categories": ["Utility"]},
+                ]
+                auto_exporter.save_auto_export_config({
+                    "destination_dir": tmp,
+                    "format": "csv",
+                    "filename_pattern": "latest",
+                    "sources": ["native", "local", "unmanaged", "flatpak"],
+                    "visibility": "all",
+                    "fields": ["name", "categories"],
+                })
+                ok, _msg, path, count = auto_exporter.run_export_job(apps_data=sample_apps)
+                self.assertTrue(ok)
+                self.assertEqual(count, 4)
+                csv_text = Path(path).read_text(encoding="utf-8")
+                self.assertIn("System; Monitor", csv_text)
+            finally:
+                auto_exporter.CONFIG_FILE = orig_cfg
+
+    def test_usage_tracker_autostart_and_steam_dedup(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch, MagicMock
+        import usage_tracker
+
+        self.assertEqual(
+            usage_tracker.normalize_unit_name(r"app-nobara\x2dcve\x2dscanner@autostart.service"),
+            "nobara-cve-scanner",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            orig_dir = usage_tracker.DATA_DIR
+            orig_db = usage_tracker.DB_PATH
+            orig_cache = dict(usage_tracker._IN_MEMORY_USAGE)
+            orig_loaded = usage_tracker._CACHE_LOADED
+            try:
+                usage_tracker.DATA_DIR = Path(tmp)
+                usage_tracker.DB_PATH = Path(tmp) / "usage.db"
+                usage_tracker._IN_MEMORY_USAGE.clear()
+                usage_tracker._CACHE_LOADED = False
+
+                fake_proc = MagicMock(returncode=0, stdout="")
+                steam_data = {"steam_999": {"name": "steam_999", "count": 1, "last_used": 1700000100.0}}
+                with patch("shutil.which", return_value="/usr/bin/journalctl"), \
+                     patch("subprocess.run", return_value=fake_proc), \
+                     patch("usage_tracker.scan_steam_last_played", return_value=steam_data):
+                    usage_tracker.sync_journal_history(force_full=False)
+                    usage_tracker.sync_journal_history(force_full=False)
+
+                _, _, count = usage_tracker.get_app_usage_metrics(steam_id="999")
+                self.assertEqual(count, 1)
+            finally:
+                usage_tracker.DATA_DIR = orig_dir
+                usage_tracker.DB_PATH = orig_db
+                usage_tracker._IN_MEMORY_USAGE.clear()
+                usage_tracker._IN_MEMORY_USAGE.update(orig_cache)
+                usage_tracker._CACHE_LOADED = orig_loaded
+
+    def test_server_csv_lists_desktop_error_and_recent_cache(self):
+        from unittest.mock import patch
+        import server
+
+        client = TestClient(app)
+        res = client.get("/api/apps?recent_hours=168")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["stats"]["recent_hours"], 168)
+
+        # Export without recent_hours must preserve the active 168h cache and format list columns cleanly
+        exp = client.get("/api/export?format=csv&fields=name,categories")
+        self.assertEqual(exp.status_code, 200)
+        self.assertNotIn("['", exp.text)
+        self.assertEqual(server._CACHED_RECENT_HOURS, 168)
+
+        # Desktop read error must return controlled 500 without NameError on logger
+        with patch("os.path.isfile", return_value=True), \
+             patch("builtins.open", side_effect=OSError("Permission denied")):
+            err = client.get("/api/desktop-content?path=/usr/share/applications/dummy.desktop")
+            self.assertEqual(err.status_code, 500)
 
 
 if __name__ == "__main__":

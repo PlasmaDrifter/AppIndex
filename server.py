@@ -3,10 +3,13 @@ AppIndex - FastAPI Server
 Serves the web dashboard, REST API, icon resolver, and desktop file inspector.
 """
 
+from contextlib import asynccontextmanager
+import configparser
 import csv
 import glob
 import io
 import json
+import logging
 import mimetypes
 import os
 import re
@@ -17,13 +20,12 @@ import tarfile
 import tempfile
 import threading
 import time
-from typing import Optional, Set, Tuple, Dict
+from typing import Any, Dict, List, Optional, Set, Tuple
 import urllib.request
-from fastapi import FastAPI, Query, HTTPException, Response, Request
+from fastapi import Body, FastAPI, Query, HTTPException, Response, Request
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-import xdg.IconTheme
 try:
     from PIL import Image
 except ImportError:
@@ -36,13 +38,29 @@ from auto_exporter import (
     save_auto_export_config,
     run_export_job,
     start_auto_export_scheduler,
+    stop_auto_export_scheduler,
     on_inventory_rescan,
 )
 
-APP_VERSION = "0.5.6"
+logger = logging.getLogger("appindex.server")
+
+APP_VERSION = "0.5.7"
 GITHUB_REPO = "PlasmaDrifter/AppIndex"
 
-app = FastAPI(title="AppIndex", version=APP_VERSION)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Manage background usage sync, auto-export scheduler, and non-blocking cache warm-up."""
+    start_background_usage_sync()
+    start_auto_export_scheduler()
+    threading.Thread(target=get_cached_or_scan, kwargs={"force_refresh": False}, daemon=True).start()
+    try:
+        yield
+    finally:
+        stop_auto_export_scheduler()
+
+
+app = FastAPI(title="AppIndex", version=APP_VERSION, lifespan=lifespan)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -58,12 +76,19 @@ async def add_static_no_cache_headers(request: Request, call_next):
     return response
 
 
-# In-memory caches
-_CACHED_DATA = None
+# Thread-safe in-memory caches
+_CACHE_LOCK = threading.RLock()
+_CACHED_DATA: Optional[Dict[str, Any]] = None
+_CACHED_RECENT_HOURS: int = 48
+_CACHED_DNF_HOURS: int = 48
 _CACHED_ALLOWED_ICON_DIRS: Optional[Tuple[str, ...]] = None
 _CACHED_ALLOWED_DESKTOP_DIRS: Optional[Tuple[str, ...]] = None
 _RESOLVED_ICON_CACHE: Dict[str, Optional[str]] = {}
 _XPM_CACHE: Dict[str, bytes] = {}
+_THEME_INDEX_CACHE: Dict[str, Dict[str, str]] = {}
+_FLAT_ICON_INDEX: Optional[Dict[str, str]] = None
+_APPSTREAM_ICON_INDEX: Optional[Dict[str, str]] = None
+_ORDERED_THEMES_CACHE: Optional[List[str]] = None
 
 
 def parse_version_tuple(ver_str: str):
@@ -169,10 +194,15 @@ def apply_self_update(target_tag: str = "") -> dict:
     is_git = os.path.isdir(os.path.join(BASE_DIR, ".git"))
 
     if is_git:
-        # Check if working tree has uncommitted local changes (e.g. during active development / testing)
-        status_check = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True)
+        # Check tracked modifications only so untracked local notes/files don't skip git pull
+        status_check = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=BASE_DIR,
+            capture_output=True,
+            text=True,
+        )
         if status_check.stdout.strip():
-            new_ver = target_tag.lstrip("v") if target_tag else "0.5.6"
+            new_ver = target_tag.lstrip("v") if target_tag else APP_VERSION
             server_file = os.path.join(BASE_DIR, "server.py")
             with open(server_file, "r") as f:
                 s_content = f.read()
@@ -266,82 +296,143 @@ def trigger_server_restart():
     t.start()
 
 
-_CACHED_RECENT_HOURS: int = 48
+def _recompute_recent_flags(data: Dict[str, Any], recent_hours: int) -> Dict[str, Any]:
+    """Update is_recent_update and stats in memory when narrowing the recent_hours window."""
+    cutoff = time.time() - (max(1, int(recent_hours)) * 3600)
+    apps_out: List[Dict[str, Any]] = []
+    recent_count = 0
+    for app_item in data.get("applications", []):
+        inst_time = float(app_item.get("install_time") or 0.0)
+        is_recent = bool(inst_time and inst_time >= cutoff)
+        if is_recent:
+            recent_count += 1
+        updated_item = dict(app_item)
+        updated_item["is_recent_update"] = is_recent
+        if is_recent and not updated_item.get("update_action"):
+            updated_item["update_action"] = "Updated"
+        elif not is_recent and updated_item.get("update_action") == "Updated":
+            updated_item["update_action"] = ""
+        apps_out.append(updated_item)
+
+    stats = dict(data.get("stats", {}))
+    stats["recently_updated"] = recent_count
+    stats["recent_hours"] = max(1, int(recent_hours))
+    return {"stats": stats, "applications": apps_out}
 
 
-def get_cached_or_scan(force_refresh: bool = False, recent_hours: int = 48):
-    global _CACHED_DATA, _CACHED_RECENT_HOURS, _CACHED_ALLOWED_ICON_DIRS, _RESOLVED_ICON_CACHE, _XPM_CACHE
-    if _CACHED_DATA is None or force_refresh or _CACHED_RECENT_HOURS != recent_hours:
-        _CACHED_DATA = scan_all_applications(recent_hours=recent_hours)
-        _CACHED_RECENT_HOURS = recent_hours
-        _CACHED_ALLOWED_ICON_DIRS = None
-        _RESOLVED_ICON_CACHE.clear()
-        _XPM_CACHE.clear()
-    return _CACHED_DATA
+def _clear_icon_caches() -> None:
+    """Clear icon path, directory, and theme index caches under _CACHE_LOCK."""
+    global _CACHED_ALLOWED_ICON_DIRS, _FLAT_ICON_INDEX, _APPSTREAM_ICON_INDEX, _ORDERED_THEMES_CACHE
+    _CACHED_ALLOWED_ICON_DIRS = None
+    _RESOLVED_ICON_CACHE.clear()
+    _XPM_CACHE.clear()
+    _THEME_INDEX_CACHE.clear()
+    _FLAT_ICON_INDEX = None
+    _APPSTREAM_ICON_INDEX = None
+    _ORDERED_THEMES_CACHE = None
+
+
+def get_cached_or_scan(force_refresh: bool = False, recent_hours: Optional[int] = None) -> Dict[str, Any]:
+    global _CACHED_DATA, _CACHED_RECENT_HOURS, _CACHED_DNF_HOURS
+    with _CACHE_LOCK:
+        target_hours = _CACHED_RECENT_HOURS if recent_hours is None else max(1, int(recent_hours))
+        if _CACHED_DATA is None or force_refresh:
+            _CACHED_DATA = scan_all_applications(recent_hours=target_hours)
+            _CACHED_RECENT_HOURS = target_hours
+            _CACHED_DNF_HOURS = target_hours
+            _clear_icon_caches()
+            return _CACHED_DATA
+
+        if target_hours != _CACHED_RECENT_HOURS:
+            if target_hours <= _CACHED_DNF_HOURS:
+                _CACHED_DATA = _recompute_recent_flags(_CACHED_DATA, target_hours)
+                _CACHED_RECENT_HOURS = target_hours
+            else:
+                _CACHED_DATA = scan_all_applications(recent_hours=target_hours)
+                _CACHED_RECENT_HOURS = target_hours
+                _CACHED_DNF_HOURS = target_hours
+        return _CACHED_DATA
 
 
 ALLOWED_IMAGE_EXTENSIONS: Tuple[str, ...] = (".png", ".svg", ".xpm", ".ico", ".webp", ".jpg", ".jpeg")
 
+ICON_ROOT_DIRS: Tuple[str, ...] = (
+    os.path.expanduser("~/.local/share/icons"),
+    os.path.expanduser("~/.icons"),
+    os.path.expanduser("~/.local/share/flatpak/exports/share/icons"),
+    "/var/lib/flatpak/exports/share/icons",
+    "/usr/local/share/icons",
+    "/usr/share/icons",
+)
+
+PIXMAP_ROOT_DIRS: Tuple[str, ...] = (
+    os.path.expanduser("~/.local/share/pixmaps"),
+    "/usr/local/share/pixmaps",
+    "/usr/share/pixmaps",
+)
+
 
 def get_allowed_desktop_dirs() -> Tuple[str, ...]:
     global _CACHED_ALLOWED_DESKTOP_DIRS
-    if _CACHED_ALLOWED_DESKTOP_DIRS is not None:
+    with _CACHE_LOCK:
+        if _CACHED_ALLOWED_DESKTOP_DIRS is not None:
+            return _CACHED_ALLOWED_DESKTOP_DIRS
+        candidate_dirs = [
+            "/usr/share/applications",
+            "/usr/local/share/applications",
+            os.path.expanduser("~/.local/share/applications"),
+            "/var/lib/flatpak",
+            os.path.expanduser("~/.local/share/flatpak"),
+        ]
+        resolved = []
+        for d in candidate_dirs:
+            r = os.path.realpath(d)
+            if not r.endswith(os.sep):
+                r += os.sep
+            resolved.append(r)
+        _CACHED_ALLOWED_DESKTOP_DIRS = tuple(resolved)
         return _CACHED_ALLOWED_DESKTOP_DIRS
-    candidate_dirs = [
-        "/usr/share/applications",
-        "/usr/local/share/applications",
-        os.path.expanduser("~/.local/share/applications"),
-        "/var/lib/flatpak",
-        os.path.expanduser("~/.local/share/flatpak"),
-    ]
-    resolved = []
-    for d in candidate_dirs:
-        r = os.path.realpath(d)
-        if not r.endswith(os.sep):
-            r += os.sep
-        resolved.append(r)
-    _CACHED_ALLOWED_DESKTOP_DIRS = tuple(resolved)
-    return _CACHED_ALLOWED_DESKTOP_DIRS
 
 
 def get_allowed_icon_dirs() -> Tuple[str, ...]:
     global _CACHED_ALLOWED_ICON_DIRS
-    if _CACHED_ALLOWED_ICON_DIRS is not None:
+    with _CACHE_LOCK:
+        if _CACHED_ALLOWED_ICON_DIRS is not None:
+            return _CACHED_ALLOWED_ICON_DIRS
+        candidate_dirs = [
+            "/usr/share/icons",
+            "/usr/share/pixmaps",
+            "/usr/local/share/icons",
+            "/usr/local/share/pixmaps",
+            os.path.expanduser("~/.local/share/icons"),
+            os.path.expanduser("~/.icons"),
+            "/var/lib/flatpak",
+            os.path.expanduser("~/.local/share/flatpak"),
+            STATIC_DIR,
+        ]
+        resolved = []
+        for d in candidate_dirs:
+            r = os.path.realpath(d)
+            if not r.endswith(os.sep):
+                r += os.sep
+            resolved.append(r)
+        # Include parent directories of verified icons discovered during desktop file scans
+        for p in get_known_scanned_icon_paths():
+            d = os.path.dirname(p)
+            if not d.endswith(os.sep):
+                d += os.sep
+            if d not in resolved:
+                resolved.append(d)
+        _CACHED_ALLOWED_ICON_DIRS = tuple(resolved)
         return _CACHED_ALLOWED_ICON_DIRS
-    candidate_dirs = [
-        "/usr/share/icons",
-        "/usr/share/pixmaps",
-        "/usr/local/share/icons",
-        "/usr/local/share/pixmaps",
-        os.path.expanduser("~/.local/share/icons"),
-        os.path.expanduser("~/.icons"),
-        "/var/lib/flatpak",
-        os.path.expanduser("~/.local/share/flatpak"),
-        STATIC_DIR,
-    ]
-    resolved = []
-    for d in candidate_dirs:
-        r = os.path.realpath(d)
-        if not r.endswith(os.sep):
-            r += os.sep
-        resolved.append(r)
-    # Include parent directories of verified icons discovered during desktop file scans
-    for p in get_known_scanned_icon_paths():
-        d = os.path.dirname(p)
-        if not d.endswith(os.sep):
-            d += os.sep
-        if d not in resolved:
-            resolved.append(d)
-    _CACHED_ALLOWED_ICON_DIRS = tuple(resolved)
-    return _CACHED_ALLOWED_ICON_DIRS
 
 
 def get_known_scanned_icon_paths() -> Set[str]:
     """Retrieve verified canonical icon paths discovered from installed desktop files."""
-    data = get_cached_or_scan()
+    data = get_cached_or_scan(force_refresh=False, recent_hours=None)
     paths = set()
-    for app in data.get("applications", []):
-        icon = app.get("icon")
+    for app_item in data.get("applications", []):
+        icon = app_item.get("icon")
         if icon and (os.path.isabs(icon) or "/" in icon or "\\" in icon):
             if icon.startswith("file://"):
                 icon = icon[7:]
@@ -351,23 +442,6 @@ def get_known_scanned_icon_paths() -> Set[str]:
             except Exception:
                 pass
     return paths
-
-
-def find_flatpak_appstream_icon(clean_name: str, allowed_dirs: Tuple[str, ...]) -> Optional[str]:
-    """Find Flatpak icon in Flatpak AppStream icon caches."""
-    base_dirs = [
-        "/var/lib/flatpak/appstream/*/*/active/icons",
-        os.path.expanduser("~/.local/share/flatpak/appstream/*/*/active/icons"),
-    ]
-    for b in base_dirs:
-        for icons_root in glob.glob(b):
-            for size in ["128x128", "64x64", "flatpak"]:
-                for ext in [".png", ".svg"]:
-                    candidate = os.path.realpath(os.path.join(icons_root, size, f"{clean_name}{ext}"))
-                    if candidate.startswith(allowed_dirs):
-                        if os.path.isfile(candidate):
-                            return candidate
-    return None
 
 
 # Known common desktop icon themes to search in order of priority
@@ -385,16 +459,272 @@ COMMON_ICON_THEMES = [
 ]
 
 
+def _detect_active_icon_theme() -> Optional[str]:
+    """Detect user's configured icon theme from KDE or GTK config."""
+    env_theme = os.environ.get("XDG_ICON_THEME", "").strip()
+    if env_theme:
+        return env_theme
+
+    kdeglobals = os.path.expanduser("~/.config/kdeglobals")
+    if os.path.isfile(kdeglobals):
+        try:
+            cp = configparser.ConfigParser(interpolation=None)
+            cp.read(kdeglobals, encoding="utf-8")
+            theme = cp.get("Icons", "Theme", fallback="").strip()
+            if theme:
+                return theme
+        except Exception:
+            pass
+
+    for gtk_ini in (
+        os.path.expanduser("~/.config/gtk-4.0/settings.ini"),
+        os.path.expanduser("~/.config/gtk-3.0/settings.ini"),
+    ):
+        if os.path.isfile(gtk_ini):
+            try:
+                cp = configparser.ConfigParser(interpolation=None)
+                cp.read(gtk_ini, encoding="utf-8")
+                theme = cp.get("Settings", "gtk-icon-theme-name", fallback="").strip().strip("\"'")
+                if theme:
+                    return theme
+            except Exception:
+                pass
+    return None
+
+
+def _read_theme_inherits(theme_name: str) -> List[str]:
+    """Read Inherits list from a theme's index.theme if present."""
+    for root in ICON_ROOT_DIRS:
+        index_path = os.path.join(root, theme_name, "index.theme")
+        if os.path.isfile(index_path):
+            try:
+                with open(index_path, "r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        if line.startswith("Inherits="):
+                            raw = line.split("=", 1)[1].strip()
+                            return [t.strip() for t in raw.split(",") if t.strip()]
+            except Exception:
+                pass
+    return []
+
+
+def _get_ordered_icon_themes() -> List[str]:
+    """Return ordered icon themes starting with the active desktop theme and its inherits."""
+    global _ORDERED_THEMES_CACHE
+    with _CACHE_LOCK:
+        if _ORDERED_THEMES_CACHE is not None:
+            return _ORDERED_THEMES_CACHE
+
+        ordered: List[str] = []
+        seen: Set[str] = set()
+
+        active = _detect_active_icon_theme()
+        if active:
+            # Expand active theme followed by its inherited themes in order
+            pending = [active]
+            while pending:
+                th = pending.pop(0)
+                if not th or th in seen:
+                    continue
+                seen.add(th)
+                if any(os.path.isdir(os.path.join(r, th)) for r in ICON_ROOT_DIRS):
+                    ordered.append(th)
+                    for idx_p, parent in enumerate(_read_theme_inherits(th)):
+                        if parent not in seen:
+                            pending.insert(idx_p, parent)
+
+        for th in ["hicolor"] + COMMON_ICON_THEMES:
+            if th not in seen and any(os.path.isdir(os.path.join(r, th)) for r in ICON_ROOT_DIRS):
+                seen.add(th)
+                ordered.append(th)
+
+        _ORDERED_THEMES_CACHE = ordered
+        return _ORDERED_THEMES_CACHE
+
+
+def _get_flat_icon_index() -> Dict[str, str]:
+    """Index top-level icon files in user icon folders and system pixmap folders."""
+    global _FLAT_ICON_INDEX
+    with _CACHE_LOCK:
+        if _FLAT_ICON_INDEX is not None:
+            return _FLAT_ICON_INDEX
+
+        index: Dict[str, str] = {}
+        allowed_dirs = get_allowed_icon_dirs()
+        flat_dirs = [
+            os.path.expanduser("~/.local/share/icons"),
+            os.path.expanduser("~/.icons"),
+        ] + list(PIXMAP_ROOT_DIRS)
+
+        for d in flat_dirs:
+            if not os.path.isdir(d):
+                continue
+            try:
+                for entry in os.scandir(d):
+                    if not entry.is_file():
+                        continue
+                    stem, ext = os.path.splitext(entry.name)
+                    ext_l = ext.lower()
+                    if ext_l not in ALLOWED_IMAGE_EXTENSIONS:
+                        continue
+                    canonical = os.path.realpath(entry.path)
+                    if not canonical.startswith(allowed_dirs):
+                        continue
+                    if entry.name not in index:
+                        index[entry.name] = canonical
+                    if stem not in index:
+                        index[stem] = canonical
+            except Exception:
+                pass
+
+        _FLAT_ICON_INDEX = index
+        return _FLAT_ICON_INDEX
+
+
+def _get_appstream_icon_index() -> Dict[str, str]:
+    """Index Flatpak AppStream icon caches once per scan."""
+    global _APPSTREAM_ICON_INDEX
+    with _CACHE_LOCK:
+        if _APPSTREAM_ICON_INDEX is not None:
+            return _APPSTREAM_ICON_INDEX
+
+        index: Dict[str, str] = {}
+        allowed_dirs = get_allowed_icon_dirs()
+        base_dirs = [
+            "/var/lib/flatpak/appstream/*/*/active/icons",
+            os.path.expanduser("~/.local/share/flatpak/appstream/*/*/active/icons"),
+        ]
+        for b in base_dirs:
+            for icons_root in glob.glob(b):
+                for size in ("128x128", "64x64", "flatpak", "scalable"):
+                    size_dir = os.path.join(icons_root, size)
+                    if not os.path.isdir(size_dir):
+                        continue
+                    try:
+                        for entry in os.scandir(size_dir):
+                            if not entry.is_file():
+                                continue
+                            stem, ext = os.path.splitext(entry.name)
+                            if ext.lower() not in ALLOWED_IMAGE_EXTENSIONS:
+                                continue
+                            canonical = os.path.realpath(entry.path)
+                            if not canonical.startswith(allowed_dirs):
+                                continue
+                            if stem not in index:
+                                index[stem] = canonical
+                            if entry.name not in index:
+                                index[entry.name] = canonical
+                    except Exception:
+                        pass
+
+        _APPSTREAM_ICON_INDEX = index
+        return _APPSTREAM_ICON_INDEX
+
+
+_SKIP_ICON_SUBDIRS = frozenset({"animations", "applets", "cursors", "emotes", "stock"})
+_FALLBACK_SKIP_ICON_SUBDIRS = _SKIP_ICON_SUBDIRS | frozenset({"actions", "emblems", "mimetypes"})
+_PRIMARY_ICON_THEMES_LIMIT = 4
+
+
+def _get_theme_index(theme_name: str, skip_actions: bool = False) -> Dict[str, str]:
+    """Build or retrieve a compact stem -> best icon path index for a single XDG theme."""
+    cache_key = f"{theme_name}:{'noact' if skip_actions else 'full'}"
+    with _CACHE_LOCK:
+        if cache_key in _THEME_INDEX_CACHE:
+            return _THEME_INDEX_CACHE[cache_key]
+
+    scored: Dict[str, Tuple[int, str]] = {}
+    allowed_dirs = get_allowed_icon_dirs()
+    home_prefix = os.path.expanduser("~")
+    skip_dirs = _FALLBACK_SKIP_ICON_SUBDIRS if skip_actions else _SKIP_ICON_SUBDIRS
+
+    for root in ICON_ROOT_DIRS:
+        tdir = os.path.join(root, theme_name)
+        if not os.path.isdir(tdir):
+            continue
+        is_user_override = root.startswith(home_prefix)
+        for dirpath, dirnames, filenames in os.walk(tdir):
+            dirnames[:] = [d for d in dirnames if d.lower() not in skip_dirs]
+            if not filenames:
+                continue
+
+            real_dir = os.path.realpath(dirpath)
+            if not (real_dir + os.sep).startswith(allowed_dirs):
+                continue
+
+            rel = dirpath[len(tdir) :].lower()
+            base_score = 1000 if is_user_override else 0
+            if "apps" in rel:
+                base_score += 200
+            elif "categories" in rel or "preferences" in rel or "devices" in rel or "places" in rel:
+                base_score += 100
+
+            if "48x48" in rel or "/48" in rel or "64x64" in rel or "/64" in rel:
+                base_score += 40
+            elif "scalable" in rel or "128x128" in rel or "/128" in rel:
+                base_score += 35
+            elif "32x32" in rel or "/32" in rel or "256x256" in rel or "/256" in rel:
+                base_score += 25
+            elif "24x24" in rel or "22x22" in rel or "16x16" in rel:
+                base_score += 5
+
+            for fn in filenames:
+                stem, ext = os.path.splitext(fn)
+                ext_l = ext.lower()
+                if ext_l not in ALLOWED_IMAGE_EXTENSIONS:
+                    continue
+                score = base_score
+                if ext_l == ".svg":
+                    score += 6
+                elif ext_l == ".png":
+                    score += 5
+                elif ext_l == ".webp":
+                    score += 4
+                elif ext_l in (".jpg", ".jpeg"):
+                    score += 3
+                elif ext_l == ".ico":
+                    score += 2
+                else:
+                    score += 1
+
+                prev = scored.get(stem)
+                if prev is None or score > prev[0]:
+                    full_path = os.path.join(dirpath, fn)
+                    if os.path.islink(full_path):
+                        candidate = os.path.realpath(full_path)
+                        if not candidate.startswith(allowed_dirs):
+                            continue
+                    else:
+                        candidate = os.path.join(real_dir, fn)
+                    scored[stem] = (score, candidate)
+
+    result = {k: v[1] for k, v in scored.items()}
+    with _CACHE_LOCK:
+        _THEME_INDEX_CACHE[cache_key] = result
+    return result
+
+
+def find_flatpak_appstream_icon(clean_name: str, allowed_dirs: Tuple[str, ...]) -> Optional[str]:
+    """Find Flatpak icon in Flatpak AppStream icon caches."""
+    appstream = _get_appstream_icon_index()
+    hit = appstream.get(clean_name)
+    if hit and hit.startswith(allowed_dirs) and os.path.isfile(hit):
+        return hit
+    return None
+
+
 def resolve_icon_path(icon_name_or_path: str) -> Optional[str]:
     """Resolve an icon name or path to an existing local file safely."""
     if not icon_name_or_path:
         return None
 
-    if icon_name_or_path in _RESOLVED_ICON_CACHE:
-        return _RESOLVED_ICON_CACHE[icon_name_or_path]
+    with _CACHE_LOCK:
+        if icon_name_or_path in _RESOLVED_ICON_CACHE:
+            return _RESOLVED_ICON_CACHE[icon_name_or_path]
 
     resolved = _resolve_icon_path_uncached(icon_name_or_path)
-    _RESOLVED_ICON_CACHE[icon_name_or_path] = resolved
+    with _CACHE_LOCK:
+        _RESOLVED_ICON_CACHE[icon_name_or_path] = resolved
     return resolved
 
 
@@ -419,51 +749,29 @@ def _resolve_icon_path_uncached(icon_name_or_path: str) -> Optional[str]:
     if not clean_name or not re.match(r"^[a-zA-Z0-9_\.\-\+@]+$", clean_name):
         return None
 
-    # Try standard XDG Icon lookup across desktop themes
-    for theme in COMMON_ICON_THEMES:
-        try:
-            found = xdg.IconTheme.getIconPath(clean_name, theme=theme)
-            if found:
-                canonical = os.path.realpath(found)
-                if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS):
-                    if canonical.startswith(allowed_dirs):
-                        if os.path.isfile(canonical):
-                            return canonical
-        except Exception:
-            pass
+    stem, ext = os.path.splitext(clean_name)
+    lookup_keys = [clean_name, stem] if (ext and ext.lower() in ALLOWED_IMAGE_EXTENSIONS) else [clean_name]
 
-    # Try with common extensions across themes
-    for ext in [".png", ".svg", ".xpm"]:
-        test_name = clean_name if clean_name.endswith(ext) else clean_name + ext
-        for theme in COMMON_ICON_THEMES:
-            try:
-                f = xdg.IconTheme.getIconPath(test_name, theme=theme)
-                if f:
-                    canonical = os.path.realpath(f)
-                    if canonical.endswith(ALLOWED_IMAGE_EXTENSIONS):
-                        if canonical.startswith(allowed_dirs):
-                            if os.path.isfile(canonical):
-                                return canonical
-            except Exception:
-                pass
+    # 1. Check flat user icon folders & pixmaps
+    flat_idx = _get_flat_icon_index()
+    for key in lookup_keys:
+        hit = flat_idx.get(key)
+        if hit and hit.startswith(allowed_dirs) and os.path.isfile(hit):
+            return hit
 
-        pix = os.path.realpath(os.path.join("/usr/share/pixmaps", test_name))
-        if pix.endswith(ALLOWED_IMAGE_EXTENSIONS):
-            if pix.startswith(allowed_dirs):
-                if os.path.isfile(pix):
-                    return pix
+    # 2. Search ordered themes lazily (active user theme + inherits -> hicolor -> common themes)
+    for idx, theme in enumerate(_get_ordered_icon_themes()):
+        theme_idx = _get_theme_index(theme, skip_actions=(idx >= _PRIMARY_ICON_THEMES_LIMIT))
+        for key in lookup_keys:
+            hit = theme_idx.get(key)
+            if hit and hit.startswith(allowed_dirs) and os.path.isfile(hit):
+                return hit
 
-    # Search in Flatpak AppStream icon cache
-    appstream_icon = find_flatpak_appstream_icon(clean_name, allowed_dirs)
-    if appstream_icon:
-        return appstream_icon
-
-    # Search in pixmaps without extension
-    pix_direct = os.path.realpath(os.path.join("/usr/share/pixmaps", clean_name))
-    if pix_direct.endswith(ALLOWED_IMAGE_EXTENSIONS):
-        if pix_direct.startswith(allowed_dirs):
-            if os.path.isfile(pix_direct):
-                return pix_direct
+    # 3. Search in Flatpak AppStream icon cache
+    for key in lookup_keys:
+        appstream_icon = find_flatpak_appstream_icon(key, allowed_dirs)
+        if appstream_icon:
+            return appstream_icon
 
     return None
 
@@ -477,8 +785,9 @@ def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
     if not canonical.endswith(".xpm"):
         return None
 
-    if canonical in _XPM_CACHE:
-        return _XPM_CACHE[canonical]
+    with _CACHE_LOCK:
+        if canonical in _XPM_CACHE:
+            return _XPM_CACHE[canonical]
 
     allowed_dirs = get_allowed_icon_dirs()
     if canonical.startswith(allowed_dirs):
@@ -489,7 +798,8 @@ def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
                 buf = io.BytesIO()
                 im.save(buf, format="PNG")
                 png_bytes = buf.getvalue()
-                _XPM_CACHE[canonical] = png_bytes
+                with _CACHE_LOCK:
+                    _XPM_CACHE[canonical] = png_bytes
                 return png_bytes
             except Exception:
                 pass
@@ -546,7 +856,8 @@ def convert_xpm_to_png(xpm_path: str) -> Optional[bytes]:
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
                 png_bytes = buf.getvalue()
-                _XPM_CACHE[canonical] = png_bytes
+                with _CACHE_LOCK:
+                    _XPM_CACHE[canonical] = png_bytes
                 return png_bytes
             except Exception:
                 return None
@@ -590,13 +901,13 @@ def status_api():
 
 
 @app.get("/api/apps")
-async def get_apps(recent_hours: int = Query(48, ge=1, le=8760)):
+def get_apps(recent_hours: int = Query(48, ge=1, le=8760)):
     """Return all scanned applications and summary statistics."""
     return get_cached_or_scan(force_refresh=False, recent_hours=recent_hours)
 
 
 @app.post("/api/refresh")
-async def refresh_apps(recent_hours: int = Query(48, ge=1, le=8760)):
+def refresh_apps(recent_hours: Optional[int] = Query(None, ge=1, le=8760)):
     """Force re-scan of the system applications."""
     start_background_usage_sync()
     result = get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
@@ -605,7 +916,7 @@ async def refresh_apps(recent_hours: int = Query(48, ge=1, le=8760)):
 
 
 @app.post("/api/scan")
-async def scan_apps_alias(recent_hours: int = Query(48, ge=1, le=8760)):
+def scan_apps_alias(recent_hours: Optional[int] = Query(None, ge=1, le=8760)):
     """Alias for /api/refresh for CLI compat."""
     start_background_usage_sync()
     result = get_cached_or_scan(force_refresh=True, recent_hours=recent_hours)
@@ -614,7 +925,7 @@ async def scan_apps_alias(recent_hours: int = Query(48, ge=1, le=8760)):
 
 
 @app.api_route("/api/icon", methods=["GET", "HEAD"])
-async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Query(None)):
+def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Query(None)):
     """Serve application icon by name or absolute path."""
     target = path or name
     if not target:
@@ -650,7 +961,7 @@ async def get_icon(name: Optional[str] = Query(None), path: Optional[str] = Quer
 
 
 @app.get("/api/desktop-content")
-async def get_desktop_content(path: str = Query(...)):
+def get_desktop_content(path: str = Query(...)):
     """Read and return raw desktop file content for viewing in the modal."""
     canonical_path = os.path.realpath(path)
     if canonical_path.endswith(".desktop"):
@@ -675,19 +986,21 @@ DEFAULT_EXPORT_FIELDS = [
 
 
 @app.get("/api/export")
-async def export_apps(
+def export_apps(
     format: str = Query("json"),
     fields: Optional[str] = Query(None, description="Comma-separated list of field names to export"),
     sources: Optional[str] = Query(None, description="Comma-separated list of source types to export"),
     visibility: Optional[str] = Query("all", description="Filter by visibility: 'all', 'in_menu', or 'hidden'"),
+    recent_hours: Optional[int] = Query(None, ge=1, le=8760),
 ):
     """Export application inventory as JSON or CSV with optional field, source, and visibility filtering."""
-    data = get_cached_or_scan(force_refresh=False)
+    data = get_cached_or_scan(force_refresh=False, recent_hours=recent_hours)
     apps = list(data.get("applications", []))
 
     # Filter by source types if specified
     if sources and sources.strip() and sources.strip().lower() != "all":
-        wanted_sources = {s.strip().lower() for s in sources.split(",") if s.strip()}
+        from auto_exporter import expand_source_filters
+        wanted_sources = expand_source_filters([sources])
         apps = [
             a for a in apps
             if a.get("source_type", "").lower() in wanted_sources
@@ -719,7 +1032,15 @@ async def export_apps(
         writer = csv.DictWriter(output, fieldnames=selected_fields, extrasaction="ignore")
         writer.writeheader()
         for app_item in sorted_apps:
-            writer.writerow(app_item)
+            row = {}
+            for field_name in selected_fields:
+                val = app_item.get(field_name)
+                if isinstance(val, list):
+                    val = "; ".join(str(v) for v in val)
+                elif val is None:
+                    val = ""
+                row[field_name] = val
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -777,15 +1098,14 @@ def apply_update_api():
 
 
 @app.get("/api/auto-export")
-async def get_auto_export_settings():
+def get_auto_export_settings():
     """Return the current auto-export configuration and execution status."""
     return get_auto_export_config()
 
 
 @app.post("/api/auto-export")
-async def update_auto_export_settings(request: Request):
+def update_auto_export_settings(body: Any = Body(...)):
     """Update auto-export configuration."""
-    body = await request.json()
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Invalid configuration format")
     try:
@@ -797,9 +1117,9 @@ async def update_auto_export_settings(request: Request):
 
 
 @app.post("/api/auto-export/run-now")
-async def trigger_auto_export_now():
+def trigger_auto_export_now():
     """Manually trigger the auto-export job immediately."""
-    data = get_cached_or_scan(force_refresh=False)
+    data = get_cached_or_scan(force_refresh=False, recent_hours=None)
     apps = data.get("applications", [])
     success, message, file_path, count = run_export_job(apps_data=apps)
     return {
@@ -812,13 +1132,6 @@ async def trigger_auto_export_now():
     }
 
 
-@app.on_event("startup")
-def on_app_startup():
-    """Initialize background daemons on application startup."""
-    start_background_usage_sync()
-    start_auto_export_scheduler()
-
-
 # Mount static assets
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -826,10 +1139,6 @@ if os.path.isdir(STATIC_DIR):
 
 def start_server(host: str = "127.0.0.1", port: int = 8765):
     """Start the Uvicorn web server."""
-    start_background_usage_sync()
-    start_auto_export_scheduler()
-    # Pre-warm cache on startup
-    get_cached_or_scan()
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 

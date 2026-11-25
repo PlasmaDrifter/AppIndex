@@ -195,6 +195,31 @@ def save_auto_export_config(new_config: Dict[str, Any]) -> Dict[str, Any]:
         return current
 
 
+SOURCE_ALIAS_MAP: Dict[str, set[str]] = {
+    "native": {"repo_rpm", "repo_pacman", "repo_apt", "repo_dpkg", "repo_system"},
+    "repo": {"repo_rpm", "repo_pacman", "repo_apt", "repo_dpkg", "repo_system"},
+    "repo_system": {"repo_rpm", "repo_pacman", "repo_apt", "repo_dpkg", "repo_system"},
+    "local": {"local_tool"},
+    "unmanaged": {"unmanaged", "web_app"},
+    "web": {"web_app"},
+    "pwa": {"web_app"},
+}
+
+
+def expand_source_filters(sources_cfg: List[str]) -> set[str]:
+    """Expand configured source filter identifiers (including UI aliases) to canonical source types."""
+    wanted: set[str] = set()
+    for s in sources_cfg:
+        for sub in str(s).split(","):
+            sub_clean = sub.strip().lower()
+            if not sub_clean:
+                continue
+            wanted.add(sub_clean)
+            if sub_clean in SOURCE_ALIAS_MAP:
+                wanted.update(SOURCE_ALIAS_MAP[sub_clean])
+    return wanted
+
+
 def run_export_job(apps_data: Optional[List[Dict[str, Any]]] = None) -> Tuple[bool, str, str, int]:
     """
     Execute export according to current configuration.
@@ -223,14 +248,9 @@ def run_export_job(apps_data: Optional[List[Dict[str, Any]]] = None) -> Tuple[bo
             _record_run_result(config, success=False, message=msg, file_path="", count=0)
             return False, msg, "", 0
 
-    # 1. Filter sources
+    # 1. Filter sources (support both canonical source_type names and UI shorthand aliases)
     sources_cfg = config.get("sources") or []
-    wanted_sources = set()
-    for s in sources_cfg:
-        for sub in s.split(","):
-            sub_clean = sub.strip().lower()
-            if sub_clean:
-                wanted_sources.add(sub_clean)
+    wanted_sources = expand_source_filters(sources_cfg)
 
     filtered_apps = []
     for a in apps_data:
@@ -360,12 +380,13 @@ def _record_run_result(
     if retained_file_count is not None:
         config["retained_file_count"] = retained_file_count
 
-    try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2)
-    except Exception as e:
-        logger.warning(f"Failed to record auto-export result: {e}")
+    with _CONFIG_LOCK:
+        try:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Failed to record auto-export result: {e}")
 
 
 def on_inventory_rescan(apps_data: Optional[List[Dict[str, Any]]] = None):

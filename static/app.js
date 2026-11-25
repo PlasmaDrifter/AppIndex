@@ -320,6 +320,22 @@ applyAllActiveSettings();
 
 let activeModalApp = null;
 
+const SORT_TEXT_COLLATOR = new Intl.Collator(undefined, { sensitivity: "base" });
+const SORT_VERSION_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+let searchDebounceTimer = null;
+
+function getEffectiveRecentHours() {
+  return (appStats && appStats.recent_hours) || userSettings.recentHours || 48;
+}
+
+function getSourceBucketKey(src) {
+  const s = String(src || "").trim().toLowerCase();
+  if (s === "native" || s === "repo" || s === "repo_system" || s.startsWith("repo_")) return "native";
+  if (s === "local" || s === "local_tool") return "local";
+  if (s === "unmanaged" || s === "web_app" || s === "web" || s === "pwa") return "unmanaged";
+  return s;
+}
+
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
   try {
@@ -353,6 +369,8 @@ document.addEventListener("DOMContentLoaded", () => {
   try {
     if (userSettings.checkForUpdates) {
       checkAppUpdatesAsync();
+    } else {
+      syncCurrentVersionBadge();
     }
   } catch (err) {
     console.error("Error checking for updates:", err);
@@ -430,15 +448,19 @@ function resetScrollPosition() {
 }
 
 function setupEventListeners() {
-  // Search input
+  // Search input (debounced for snappy typing across large catalogs)
   searchInput.addEventListener("input", (e) => {
     currentSearchTerm = e.target.value.trim().toLowerCase();
     clearSearchBtn.style.display = currentSearchTerm ? "flex" : "none";
-    resetScrollPosition();
-    renderApplications();
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      resetScrollPosition();
+      renderApplications();
+    }, 75);
   });
 
   clearSearchBtn.addEventListener("click", () => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     searchInput.value = "";
     currentSearchTerm = "";
     clearSearchBtn.style.display = "none";
@@ -766,6 +788,8 @@ function setupEventListeners() {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      const colorPopover = document.getElementById("appindex-color-popover");
+      if (colorPopover && !colorPopover.classList.contains("hidden")) return;
       if (detailModal && detailModal.style.display !== "none") closeModal();
       if (settingsModal && settingsModal.style.display !== "none") closeSettingsModal();
       if (exportModalElem && exportModalElem.style.display !== "none") closeExportModal();
@@ -936,6 +960,10 @@ function updateStatsUI() {
   if (repoPkgMgr && appStats.distro && appStats.distro.pkg_manager_label) {
     repoPkgMgr.textContent = appStats.distro.pkg_manager_label;
   }
+  const autoExportNativeLabel = document.getElementById("auto-export-native-label");
+  if (autoExportNativeLabel && appStats.distro && appStats.distro.pkg_manager_label) {
+    autoExportNativeLabel.textContent = `Native Repositories (${appStats.distro.pkg_manager_label})`;
+  }
   const countRpm = document.getElementById("count-rpm");
   if (countRpm) countRpm.textContent = appStats.repo_system ?? appStats.repo_rpm ?? 0;
   const countFlatpak = document.getElementById("count-flatpak");
@@ -998,37 +1026,37 @@ function getFilteredApps() {
     return true;
   }).sort((a, b) => {
     if (currentSort === "name_asc") {
-      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "name_desc") {
-      return b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
+      return SORT_TEXT_COLLATOR.compare(b.name, a.name);
     } else if (currentSort === "source" || currentSort === "source_asc") {
-      return a.source_label.localeCompare(b.source_label) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_TEXT_COLLATOR.compare(a.source_label, b.source_label) || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "source_desc") {
-      return b.source_label.localeCompare(a.source_label) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_TEXT_COLLATOR.compare(b.source_label, a.source_label) || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "pkg" || currentSort === "pkg_asc") {
-      return (a.package_name || "").localeCompare(b.package_name || "") || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_TEXT_COLLATOR.compare(a.package_name || "", b.package_name || "") || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "pkg_desc") {
-      return (b.package_name || "").localeCompare(a.package_name || "") || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_TEXT_COLLATOR.compare(b.package_name || "", a.package_name || "") || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "updated_desc") {
-      return (b.install_time || 0) - (a.install_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return (b.install_time || 0) - (a.install_time || 0) || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "updated_asc") {
-      return (a.install_time || 0) - (b.install_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return (a.install_time || 0) - (b.install_time || 0) || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "version_desc") {
-      return (b.package_version || "").localeCompare(a.package_version || "", undefined, { numeric: true, sensitivity: "base" }) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_VERSION_COLLATOR.compare(b.package_version || "", a.package_version || "") || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "version_asc") {
-      return (a.package_version || "").localeCompare(b.package_version || "", undefined, { numeric: true, sensitivity: "base" }) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_VERSION_COLLATOR.compare(a.package_version || "", b.package_version || "") || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "last_used_desc") {
-      return (b.last_used_time || 0) - (a.last_used_time || 0) || (b.launch_count || 0) - (a.launch_count || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return (b.last_used_time || 0) - (a.last_used_time || 0) || (b.launch_count || 0) - (a.launch_count || 0) || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "last_used_asc") {
       const aTime = a.last_used_time || Number.MAX_SAFE_INTEGER;
       const bTime = b.last_used_time || Number.MAX_SAFE_INTEGER;
-      return aTime - bTime || (a.launch_count || 0) - (b.launch_count || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return aTime - bTime || (a.launch_count || 0) - (b.launch_count || 0) || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "launches_desc") {
-      return (b.launch_count || 0) - (a.launch_count || 0) || (b.last_used_time || 0) - (a.last_used_time || 0) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return (b.launch_count || 0) - (a.launch_count || 0) || (b.last_used_time || 0) - (a.last_used_time || 0) || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "category_asc" || currentSort === "menu_asc") {
-      return (a.primary_category || "Other").localeCompare(b.primary_category || "Other", undefined, { sensitivity: "base" }) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_TEXT_COLLATOR.compare(a.primary_category || "Other", b.primary_category || "Other") || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     } else if (currentSort === "category_desc" || currentSort === "menu_desc") {
-      return (b.primary_category || "Other").localeCompare(a.primary_category || "Other", undefined, { sensitivity: "base" }) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return SORT_TEXT_COLLATOR.compare(b.primary_category || "Other", a.primary_category || "Other") || SORT_TEXT_COLLATOR.compare(a.name, b.name);
     }
     return 0;
   });
@@ -1177,10 +1205,12 @@ function renderCards(apps) {
       ? (app.comment && app.comment !== app.generic_name ? `${app.generic_name} — ${app.comment}` : app.generic_name)
       : (app.comment || "");
 
+    const recentHoursLabel = formatRecentHoursBadge(getEffectiveRecentHours());
+
     card.innerHTML = `
       <div>
         <div class="card-top">
-          <img class="app-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.src='/api/icon'">
+          <img class="app-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/api/icon'">
           <div class="card-header-info">
             <div class="card-title-row">
               <h3 class="app-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</h3>
@@ -1203,7 +1233,7 @@ function renderCards(apps) {
                   </div>
                 `;
               })()}
-              ${app.is_recent_update ? `<span class="badge badge-recent-update" title="Updated within last 48 hours">Updated</span>` : ""}
+              ${app.is_recent_update ? `<span class="badge badge-recent-update" title="Updated within last ${escapeHtml(recentHoursLabel)}">Updated</span>` : ""}
             </div>
           </div>
         </div>
@@ -1325,14 +1355,16 @@ function renderTable(apps) {
       `;
     }
 
+    const recentHoursLabel = formatRecentHoursBadge(getEffectiveRecentHours());
+
     tr.innerHTML = `
       <td class="col-icon">
-        <img class="table-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.src='/api/icon'">
+        <img class="table-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/api/icon'">
       </td>
       <td class="col-app-name">
         <div class="table-app-title-row">
           <strong class="table-app-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</strong>
-          ${app.is_recent_update ? `<span class="badge badge-recent-update" style="font-size: 9px; padding: 1px 5px; flex-shrink: 0;" title="Updated within last 48 hours">Updated</span>` : ""}
+          ${app.is_recent_update ? `<span class="badge badge-recent-update" style="font-size: 9px; padding: 1px 5px; flex-shrink: 0;" title="Updated within last ${escapeHtml(recentHoursLabel)}">Updated</span>` : ""}
         </div>
         <div class="table-app-generic" title="${escapeHtml(app.generic_name || app.comment || "")}">${escapeHtml(app.generic_name || app.comment || "")}</div>
       </td>
@@ -1396,6 +1428,10 @@ function openModal(app) {
     ? `/api/icon?name=${encodeURIComponent(app.icon)}`
     : "/api/icon";
 
+  modalAppIcon.onerror = function () {
+    this.onerror = null;
+    this.src = "/api/icon";
+  };
   modalAppIcon.src = iconUrl;
   modalAppName.textContent = app.name;
   modalAppGeneric.textContent = app.generic_name || app.comment || "";
@@ -1420,7 +1456,7 @@ function openModal(app) {
       }
     }
     if (app.is_recent_update) {
-      updateText += " — Updated within last 48h";
+      updateText += ` — Updated within last ${formatRecentHoursBadge(getEffectiveRecentHours())}`;
     }
     modalLastUpdated.textContent = updateText;
   }
@@ -1654,6 +1690,21 @@ function applyGitHubNav() {
   if (link) {
     link.style.display = userSettings.showGitHubBtn ? "inline-flex" : "none";
   }
+}
+
+function syncCurrentVersionBadge() {
+  fetch("/api/status", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (data && data.version) {
+        const verText = data.version.startsWith("v") ? data.version : `v${data.version}`;
+        const settingsVer = document.getElementById("settings-app-version");
+        if (settingsVer) settingsVer.textContent = verText;
+        const brandVer = document.getElementById("brand-app-version");
+        if (brandVer) brandVer.textContent = verText;
+      }
+    })
+    .catch(() => {});
 }
 
 function checkAppUpdatesAsync(force = false) {
@@ -2122,6 +2173,7 @@ function initInAppColorPicker() {
   // Close on Escape key
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !popover.classList.contains("hidden")) {
+      e.stopImmediatePropagation();
       closePopover();
     }
   });
@@ -3034,10 +3086,18 @@ function syncAutoExportUI(cfg) {
     destInput.value = cfg.destination_dir;
   }
 
-  // Sources
-  const srcSet = new Set(cfg.sources || []);
+  // Sources (expand both backend source_type strings and UI shorthand keys)
+  const srcBuckets = new Set();
+  (cfg.sources || []).forEach((item) => {
+    String(item)
+      .split(",")
+      .forEach((sub) => {
+        const bucket = getSourceBucketKey(sub);
+        if (bucket) srcBuckets.add(bucket);
+      });
+  });
   document.querySelectorAll('input[name="auto-export-source"]').forEach((cb) => {
-    cb.checked = srcSet.has(cb.value);
+    cb.checked = srcBuckets.has(getSourceBucketKey(cb.value));
   });
 
   // Visibility
@@ -3103,7 +3163,7 @@ function collectAutoExportConfigFromUI() {
     filename_pattern: patternSel ? patternSel.value : "both",
     max_retained_entries: isNaN(maxRetained) ? 10 : maxRetained,
     destination_dir: destInput ? (destInput.value.trim() || "~/Documents/AppIndex_Exports") : "~/Documents/AppIndex_Exports",
-    sources: sources.length > 0 ? sources : ["repo_rpm,repo_pacman,repo_apt,repo_dpkg", "flatpak", "appimage", "steam", "local_tool", "unmanaged,web_app"],
+    sources: sources.length > 0 ? sources : ["native", "flatpak", "appimage", "steam", "local", "unmanaged"],
     visibility: visibility,
     fields: fields.length > 0 ? fields : ["name", "source_label", "package_name", "package_version", "installed_size", "in_menu", "primary_category", "exec_command", "desktop_path", "uninstall_command"],
   };
@@ -3119,7 +3179,7 @@ function initAutoExportUI() {
     });
   }
 
-  const btnDestDefault = document.getElementById("btn-auto-export-dest-default");
+  const btnDestDefault = document.getElementById("btn-auto-export-reset-dir");
   const destInput = document.getElementById("auto-export-dest");
   if (btnDestDefault && destInput) {
     btnDestDefault.addEventListener("click", () => {
@@ -3129,8 +3189,8 @@ function initAutoExportUI() {
   }
 
   // Sources shortcuts
-  const btnSourcesAll = document.getElementById("btn-auto-export-sources-all");
-  const btnSourcesNone = document.getElementById("btn-auto-export-sources-none");
+  const btnSourcesAll = document.getElementById("btn-auto-export-src-all");
+  const btnSourcesNone = document.getElementById("btn-auto-export-src-none");
   if (btnSourcesAll) {
     btnSourcesAll.addEventListener("click", () => {
       document.querySelectorAll('input[name="auto-export-source"]').forEach((cb) => (cb.checked = true));
@@ -3144,7 +3204,7 @@ function initAutoExportUI() {
 
   // Fields shortcuts
   const btnFieldsAll = document.getElementById("btn-auto-export-fields-all");
-  const btnFieldsDefaults = document.getElementById("btn-auto-export-fields-defaults");
+  const btnFieldsDefaults = document.getElementById("btn-auto-export-fields-default");
   const btnFieldsNone = document.getElementById("btn-auto-export-fields-none");
   if (btnFieldsAll) {
     btnFieldsAll.addEventListener("click", () => {
@@ -3187,7 +3247,7 @@ function initAutoExportUI() {
         showToast("Failed to save auto-export settings");
       } finally {
         btnSave.disabled = false;
-        btnSave.textContent = "Save Auto-Export Settings";
+        btnSave.textContent = "Save Schedule";
       }
     });
   }
